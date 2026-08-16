@@ -28,6 +28,9 @@ def test_dashboard_health_and_project_flow(tmp_path: Path, monkeypatch) -> None:
     assert "AI Lab" in dashboard.text
     assert "Ideogram 4" in dashboard.text
     assert "JoyAI-Video-Edit" in dashboard.text
+    assert "Workflow: 15 доступно" in dashboard.text
+    assert "Скачать workflow (15)" in dashboard.text
+    assert "freefuse_zimage_complete" not in dashboard.text
     assert "запуск готов" not in dashboard.text
     assert "нужен первый ручной тест" not in dashboard.text
     assert dashboard.text.index("1 · Image generation") < dashboard.text.index("2 · Image editing")

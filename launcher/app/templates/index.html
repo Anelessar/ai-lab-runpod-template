@@ -116,6 +116,7 @@
                   {% else %}
                     <span class="chip {% if status.installed %}ok{% endif %}">Программа: {% if status.installed %}готова{% else %}нет{% endif %}</span>
                   {% endif %}
+                  {% if tool.workflows %}<span class="chip {% if status.workflows %}ok{% endif %}">Workflow: {{ tool.workflows|length }} {% if status.workflows %}скачано{% else %}доступно{% endif %}</span>{% endif %}
                   <span class="chip {% if status.models %}ok{% endif %}">Модели: {% if status.models %}есть{% else %}нет{% endif %}</span>
                   <span class="chip">{{ status.disk }} + {{ status.model_disk }}</span>
                   {% if status.running %}<span class="chip live">Запущен</span>{% endif %}
@@ -130,10 +131,15 @@
                     <form action="/tools/{{ tool.id }}/models" method="post"><button>Скачать модели</button></form>
                   {% endif %}
                   {% if tool.workflows and not status.workflows %}
-                    <form action="/tools/{{ tool.id }}/workflows" method="post"><button>Скачать workflow</button></form>
+                    <form action="/tools/{{ tool.id }}/workflows" method="post"><button>Скачать workflow ({{ tool.workflows|length }})</button></form>
                   {% endif %}
                   {% if status.workflows %}
-                    {% for workflow in tool.workflows %}<a class="button" href="/workflows/{{ tool.id }}/{{ workflow.name }}">JSON: {{ workflow.name }}</a>{% endfor %}
+                    <details class="workflow-list">
+                      <summary>Открыть workflow ({{ tool.workflows|length }})</summary>
+                      <div>
+                        {% for workflow in tool.workflows %}<a href="/workflows/{{ tool.id }}/{{ workflow.name }}">{{ workflow.name }}</a>{% endfor %}
+                      </div>
+                    </details>
                   {% endif %}
                   {% if tool.launch.mode in ['comfyui', 'web'] %}<a class="button" href="/tools/{{ tool.id }}/open" target="_blank">Открыть</a>{% endif %}
                   {% if tool.launch.mode == 'process' and status.installed and not status.running %}

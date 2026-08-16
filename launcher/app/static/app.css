@@ -50,6 +50,10 @@ main { width: min(1500px, 94vw); margin: 28px auto 80px; display: grid; gap: 38p
 .pipeline { border-left: 3px solid var(--accent); padding-left: 10px; color: #dce1e8; }
 .muted, .job { color: var(--muted); font-size: 13px; }
 .instructions { border-top: 1px solid var(--border); padding-top: 10px; }
+.workflow-list { width: 100%; border: 1px solid var(--border); border-radius: 9px; background: var(--panel-2); }
+.workflow-list summary { cursor: pointer; padding: 9px 12px; font-weight: 650; }
+.workflow-list > div { display: grid; gap: 7px; padding: 0 12px 12px; }
+.workflow-list a { overflow-wrap: anywhere; }
 .run-form { border: 1px solid #4c3b7d; background: #171329; padding: 10px; border-radius: 10px; }
 .run-form summary { cursor: pointer; font-weight: 700; }
 .run-form form { display: grid; gap: 10px; margin-top: 12px; }

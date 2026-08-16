@@ -46,6 +46,34 @@ def test_ready_comfyui_tools_have_downloadable_workflows() -> None:
     assert all(workflow.url or workflow.local_file for tool in ready_comfy for workflow in tool.workflows)
 
 
+def test_tools_with_official_comfyui_workflows_are_connected_to_the_launcher() -> None:
+    registry = ManifestRegistry(ROOT / "manifests").load()
+    official_workflow_tools = {
+        "asymflow",
+        "ernie-image",
+        "flux2-klein",
+        "freefuse",
+        "genfocus",
+        "ideogram-4",
+        "ltx-2-5",
+        "lucida-v7",
+        "mage-flow",
+        "minimax-h3",
+        "mrflow",
+        "qwen-image-2512",
+        "qwen-image-edit-2511",
+        "qwen-image-layered",
+        "turbodiffusion",
+        "wan-animate-2",
+        "z-image",
+    }
+
+    assert all(registry.get(tool_id).workflows for tool_id in official_workflow_tools)
+    assert all(
+        registry.get(tool_id).launch.mode == "comfyui" for tool_id in official_workflow_tools
+    )
+
+
 def test_every_free_tool_has_a_concrete_pipeline() -> None:
     registry = ManifestRegistry(ROOT / "manifests").load()
     assert all(tool.pipeline.strip() for tool in registry.all() if tool.access == "free")

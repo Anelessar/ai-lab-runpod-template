@@ -2,19 +2,21 @@ tools:
   - id: wan-animate-2
     name: Wan-Animate-2
     category: "8 · Video control and animation"
-    kind: standalone
+    kind: comfyui
     description: End-to-end character animation/replacement по reference character и driving video с управлением ракурсом.
     source_url: https://github.com/Wan-Video/Wan-Animate-2
     repo_url: https://github.com/Wan-Video/Wan-Animate-2
     priority: must
-    adapter_status: catalogued
+    adapter_status: ready
     requirements: ["несколько мощных GPU для Base", "NVIDIA GPU"]
     inputs: [image, video, text]
     outputs: [video]
     pipeline: "character reference + driving video + prompt → Wan-Animate-2 → MP4"
-    install: {mode: git-auto, instructions: "Официальный Python/Gradio repo устанавливается отдельно; после clone фиксируется commit."}
-    models: {mode: manual, instructions: "Скачать Base либо 10-step Distilled checkpoint по официальному README."}
-    launch: {mode: disabled}
+    install: {mode: disabled, instructions: "Официальный workflow работает в актуальном ComfyUI; отдельный Python/Gradio-интерфейс для первого теста не нужен."}
+    models: {mode: manual, instructions: "Открыть workflow и скачать указанные Wan-Animate-2 Base либо Distilled checkpoints и зависимости в соответствующие папки ComfyUI."}
+    launch: {mode: comfyui}
+    workflows:
+      - {name: wan_animate_2, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_wan_animate2.json}
 
   - id: interactavatar
     name: InteractAvatar

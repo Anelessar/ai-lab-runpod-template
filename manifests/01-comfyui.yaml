@@ -17,6 +17,9 @@ tools:
     workflows:
       - {name: image_z_image, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_z_image.json}
       - {name: image_z_image_turbo, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_z_image_turbo.json}
+      - {name: image_z_image_int8, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_z_image_int8.json}
+      - {name: image_z_image_turbo_int8, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_z_image_turbo_int8.json}
+      - {name: image_z_image_turbo_union_controlnet, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_z_image_turbo_fun_union_controlnet.json}
 
   - id: qwen-image-2512
     name: Qwen-Image-2512
@@ -35,6 +38,8 @@ tools:
     launch: {mode: comfyui}
     workflows:
       - {name: image_qwen_2512, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_Image_2512.json}
+      - {name: image_qwen_2512_controlnet, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_Image_2512_controlnet.json}
+      - {name: image_qwen_2512_2step_lora, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_2512_with_2steps_lora.json}
 
   - id: flux2-klein
     name: FLUX.2 Klein
@@ -52,8 +57,13 @@ tools:
     models: {mode: manual, instructions: "Скачать выбранный Klein checkpoint и encoders через Hugging Face Download Manager."}
     launch: {mode: comfyui}
     workflows:
-      - {name: flux2_klein_t2i, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_text_to_image.json}
-      - {name: flux2_klein_edit, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_image_edit_4b_distilled.json}
+      - {name: flux2_klein_4b_t2i, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_text_to_image.json}
+      - {name: flux2_klein_9b_t2i, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_text_to_image_9b.json}
+      - {name: flux2_klein_4b_base_edit, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_image_edit_4b_base.json}
+      - {name: flux2_klein_4b_distilled_edit, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_image_edit_4b_distilled.json}
+      - {name: flux2_klein_9b_base_edit, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_image_edit_9b_base.json}
+      - {name: flux2_klein_9b_distilled_edit, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_image_edit_9b_distilled.json}
+      - {name: flux2_klein_9b_kv_edit, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_9b_kv_image_edit.json}
 
   - id: asymflow
     name: AsymFlow / AsymFLUX.2 Klein 9B
@@ -109,6 +119,22 @@ tools:
     install: {mode: manual, instructions: "Установить ветку comfyui через ComfyUI Manager; версия должна совпадать с текущей базой."}
     models: {mode: manual, instructions: "Скачать базовую модель и subject-LoRA вручную."}
     launch: {mode: comfyui}
+    workflows:
+      - {name: freefuse_zimage_complete, url: https://raw.githubusercontent.com/yaoliliu/FreeFuse/master/freefuse_comfyui/workflows/zimage_freefuse_complete.json}
+      - {name: freefuse_zimage_editor, url: https://raw.githubusercontent.com/yaoliliu/FreeFuse/master/freefuse_comfyui/workflows/zimage_freefuse_with_editor.json}
+      - {name: freefuse_zimage_controlnet_complete, url: https://raw.githubusercontent.com/yaoliliu/FreeFuse/master/freefuse_comfyui/workflows/controlnet_zimage_freefuse_complete.json}
+      - {name: freefuse_zimage_controlnet_editor, url: https://raw.githubusercontent.com/yaoliliu/FreeFuse/master/freefuse_comfyui/workflows/controlnet_zimage_freefuse_with_editor.json}
+      - {name: freefuse_zimage_gguf_complete, url: https://raw.githubusercontent.com/yaoliliu/FreeFuse/master/freefuse_comfyui/workflows/gguf_zimage_freefuse_complete.json}
+      - {name: freefuse_zimage_gguf_editor, url: https://raw.githubusercontent.com/yaoliliu/FreeFuse/master/freefuse_comfyui/workflows/gguf_zimage_freefuse_with_editor.json}
+      - {name: freefuse_flux_complete, url: https://raw.githubusercontent.com/yaoliliu/FreeFuse/master/freefuse_comfyui/workflows/flux_freefuse_complete.json}
+      - {name: freefuse_flux_editor, url: https://raw.githubusercontent.com/yaoliliu/FreeFuse/master/freefuse_comfyui/workflows/flux_freefuse_with_editor.json}
+      - {name: freefuse_flux2_klein_4b_complete, url: https://raw.githubusercontent.com/yaoliliu/FreeFuse/master/freefuse_comfyui/workflows/flux2_klein_4b_freefuse_complete.json}
+      - {name: freefuse_flux2_klein_4b_editor, url: https://raw.githubusercontent.com/yaoliliu/FreeFuse/master/freefuse_comfyui/workflows/flux2_klein_4b_freefuse_with_editor.json}
+      - {name: freefuse_flux2_klein_9b_complete, url: https://raw.githubusercontent.com/yaoliliu/FreeFuse/master/freefuse_comfyui/workflows/flux2_klein_9b_freefuse_complete.json}
+      - {name: freefuse_flux2_klein_9b_editor, url: https://raw.githubusercontent.com/yaoliliu/FreeFuse/master/freefuse_comfyui/workflows/flux2_klein_9b_freefuse_with_editor.json}
+      - {name: freefuse_sdxl_complete, url: https://raw.githubusercontent.com/yaoliliu/FreeFuse/master/freefuse_comfyui/workflows/sdxl_freefuse_complete.json}
+      - {name: freefuse_sdxl_editor, url: https://raw.githubusercontent.com/yaoliliu/FreeFuse/master/freefuse_comfyui/workflows/sdxl_freefuse_with_editor.json}
+      - {name: freefuse_krea2_editor, url: https://raw.githubusercontent.com/yaoliliu/FreeFuse/master/freefuse_comfyui/workflows/krea2_freefuse_with_editor.json}
 
   - id: lucida-v7
     name: Lucida v7
@@ -125,6 +151,8 @@ tools:
     install: {mode: disabled, instructions: "Использовать background-removal nodes актуального ComfyUI."}
     models: {mode: manual, instructions: "Скачать lucida.safetensors в models/background_removal."}
     launch: {mode: comfyui}
+    workflows:
+      - {name: lucida_remove_background, url: https://raw.githubusercontent.com/egeorcun/lucida/main/docs/comfyui/lucida_remove_background.json}
 
   - id: qwen-image-edit-2511
     name: Qwen-Image-Edit-2511
@@ -143,6 +171,8 @@ tools:
     launch: {mode: comfyui}
     workflows:
       - {name: qwen_edit_2511, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_edit_2511.json}
+      - {name: qwen_edit_2511_int8, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_edit_2511_int8.json}
+      - {name: qwen_edit_2511_inflation_lora, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image-qwen_image_edit_2511_lora_inflation.json}
 
   - id: qwen-image-layered
     name: Qwen-Image-Layered
@@ -161,6 +191,7 @@ tools:
     launch: {mode: comfyui}
     workflows:
       - {name: qwen_image_layered, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_layered.json}
+      - {name: qwen_image_layered_control, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_layered_control.json}
 
   - id: genfocus
     name: Genfocus
@@ -178,6 +209,10 @@ tools:
     install: {mode: manual, instructions: "Установить comfyui-refocus через ComfyUI Manager по инструкции авторов."}
     models: {mode: manual, instructions: "Скачать DeblurNet/BokehNet checkpoints, указанные репозиторием."}
     launch: {mode: comfyui}
+    workflows:
+      - {name: genfocus_deblur_simple, url: https://raw.githubusercontent.com/EricRollei/comfyui-refocus/main/workflows/Deblur_Eric_1225_simple.json}
+      - {name: genfocus_refocus, url: https://raw.githubusercontent.com/EricRollei/comfyui-refocus/main/workflows/Refocus-Eric-1225.json}
+      - {name: genfocus_advanced_conditions, url: https://raw.githubusercontent.com/EricRollei/comfyui-refocus/main/workflows/workflow_advanced_conditions.json}
 
   - id: minimax-h3
     name: MiniMax H3
@@ -282,6 +317,8 @@ tools:
     install: {mode: manual, instructions: "Установить community Comfyui_turbodiffusion через Manager."}
     models: {mode: manual, instructions: "Скачать checkpoint, точно соответствующий выбранной Wan base."}
     launch: {mode: comfyui}
+    workflows:
+      - {name: turbodiffusion_wan, url: https://raw.githubusercontent.com/anveshane/Comfyui_turbodiffusion/main/turbowan_workflow.json}
 
   - id: mrflow
     name: MrFlow
@@ -298,3 +335,5 @@ tools:
     install: {mode: manual, instructions: "Скопировать официальный ComfyUI-MrFlow plugin и установить его зависимости."}
     models: {mode: manual, instructions: "Использует модель базового workflow; отдельный универсальный checkpoint отсутствует."}
     launch: {mode: comfyui}
+    workflows:
+      - {name: mrflow_qwen_image, url: https://raw.githubusercontent.com/Xingyu-Zheng/MrFlow/main/ComfyUI-MrFlow/examples/qwen_mrflow_workflow.json}

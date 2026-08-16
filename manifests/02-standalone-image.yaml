@@ -2,64 +2,66 @@ tools:
   - id: ideogram-4
     name: Ideogram 4
     category: "1 · Image generation"
-    kind: standalone
+    kind: comfyui
     description: Открытая 9.3B text-to-image модель Ideogram для типографики, сложного layout, JSON-промптов, цветовых палитр и изображений до 2K.
     source_url: https://github.com/ideogram-oss/ideogram4
     repo_url: https://github.com/ideogram-oss/ideogram4
     priority: must
     access: free
-    adapter_status: catalogued
+    adapter_status: ready
     license_note: Код Apache-2.0; веса Ideogram 4 доступны после принятия gated Non-Commercial лицензии. Для коммерческого использования нужна отдельная лицензия Ideogram.
     requirements: ["24 GB VRAM для NF4", "HF_TOKEN и принятая лицензия модели"]
     inputs: [text, json]
     outputs: [image]
     pipeline: "обычный prompt → Magic Prompt/свой LLM → structured JSON → Ideogram 4 NF4 → PNG → общая галерея"
-    install:
-      mode: git-auto
-      commands:
-        - "uv venv '{env_dir}' --python 3.12"
-        - "uv pip install --python '{env_dir}/bin/python' ."
-      instructions: Официальный inference-репозиторий устанавливается в отдельное окружение; затем используется run_inference.py.
-    models:
-      mode: huggingface
-      repo_ids: [ideogram-ai/ideogram-4-nf4]
-      instructions: Сначала принять лицензию ideogram-ai/ideogram-4-nf4 на Hugging Face и передать HF_TOKEN через RunPod Secret.
-      size_gb: 20
-    launch: {mode: disabled}
+    install: {mode: disabled, instructions: "Официальная поддержка уже входит в актуальный ComfyUI; отдельный Python-интерфейс для теста не нужен."}
+    models: {mode: manual, instructions: "Открыть выбранный workflow и скачать указанные в нём Ideogram 4 checkpoint/encoders в соответствующие папки ComfyUI. Для gated-весов сначала принять лицензию на Hugging Face."}
+    launch: {mode: comfyui}
+    workflows:
+      - {name: ideogram4_t2i, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_ideogram4_t2i.json}
+      - {name: ideogram4_t2i_int8, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_ideogram4_t2i_int8.json}
 
   - id: mage-flow
     name: Mage-Flow / Mage-Flow-Edit
     category: "1 · Image generation"
-    kind: standalone
+    kind: comfyui
     description: Компактная линейка Microsoft для text-to-image и instruction editing, включая четырёхшаговые Turbo checkpoints.
     source_url: https://microsoft.github.io/Mage/flow/
     repo_url: https://github.com/microsoft/Mage
     priority: must
-    adapter_status: catalogued
+    adapter_status: ready
     requirements: ["18–20 GB VRAM для BF16", "NVIDIA GPU"]
     inputs: [text, image]
     outputs: [image]
     pipeline: "prompt/image + инструкция → Mage checkpoint → PNG → ComfyUI"
-    install: {mode: git-auto, instructions: "Код устанавливается в отдельное uv-окружение; после клонирования фиксируется фактический commit."}
-    models: {mode: manual, instructions: "Выбрать Base/RL/Turbo/Edit checkpoint по официальному Model Zoo и скачать в папку модели Mage."}
-    launch: {mode: disabled}
+    install: {mode: disabled, instructions: "Официальные workflow работают в актуальном ComfyUI; отдельную программу Mage для первого теста ставить не нужно."}
+    models: {mode: manual, instructions: "Открыть workflow и скачать указанные в нём INT8 checkpoint, text encoder и VAE в соответствующие папки ComfyUI."}
+    launch: {mode: comfyui}
+    workflows:
+      - {name: mage_flow_t2i_int8, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_mage_flow_t2i_int8.json}
+      - {name: mage_flow_turbo_t2i_int8, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_mage_flow_turbo_t2i_int8.json}
+      - {name: mage_flow_edit_int8, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_mage_flow_edit_int8.json}
+      - {name: mage_flow_edit_turbo_int8, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_mage_flow_edit_turbo_int8.json}
 
   - id: ernie-image
     name: ERNIE-Image 8B / Turbo
     category: "1 · Image generation"
-    kind: standalone
+    kind: comfyui
     description: Локальная image-модель Baidu с сильным текстом/layout и быстрой Turbo-веткой.
     source_url: https://github.com/baidu/ernie-image
     repo_url: https://github.com/baidu/ernie-image
     priority: mid
-    adapter_status: catalogued
+    adapter_status: ready
     requirements: ["NVIDIA GPU"]
     inputs: [text]
     outputs: [image]
     pipeline: "prompt → ERNIE Turbo/full → OCR → PNG → ComfyUI"
-    install: {mode: git-auto, instructions: "Официальный репозиторий и зависимости устанавливаются отдельно от Launcher."}
-    models: {mode: manual, instructions: "Скачать официальный ERNIE-Image checkpoint по инструкции репозитория."}
-    launch: {mode: disabled}
+    install: {mode: disabled, instructions: "Официальная поддержка уже входит в актуальный ComfyUI; отдельную программу устанавливать не нужно."}
+    models: {mode: manual, instructions: "Открыть workflow и скачать full либо Turbo checkpoint и остальные указанные файлы в соответствующие папки ComfyUI."}
+    launch: {mode: comfyui}
+    workflows:
+      - {name: ernie_image_8b, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_ernie_image.json}
+      - {name: ernie_image_turbo, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_ernie_image_turbo.json}
 
   - id: redesign
     name: ReDesign
