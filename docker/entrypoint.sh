@@ -83,7 +83,7 @@ LAUNCHER_PID=$!
 
 log "Starting ComfyUI on port 8188"
 cd /opt/ComfyUI
-python3 main.py \
+/usr/local/bin/python main.py \
   --listen 0.0.0.0 \
   --port 8188 \
   --input-directory "$AI_LAB_ROOT/bridge/comfyui/input" \
@@ -93,7 +93,7 @@ python3 main.py \
 COMFY_PID=$!
 
 if [[ -z "${JUPYTER_TOKEN:-}" ]]; then
-  JUPYTER_TOKEN="$(python3 -c 'import secrets; print(secrets.token_urlsafe(18))')"
+  JUPYTER_TOKEN="$(/usr/local/bin/python -c 'import secrets; print(secrets.token_urlsafe(18))')"
   log "Generated one-time Jupyter token: $JUPYTER_TOKEN"
 fi
 log "Starting JupyterLab on port 8888"

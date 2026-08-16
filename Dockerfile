@@ -29,7 +29,8 @@ COPY adapters /opt/ai-lab-template/adapters
 COPY scripts /opt/ai-lab-template/scripts
 COPY docker /opt/ai-lab-template/docker
 
-RUN uv venv /opt/ai-lab-launcher-venv --python python3 \
+RUN ln -sf /usr/local/bin/python /usr/local/bin/python3 \
+    && uv venv /opt/ai-lab-launcher-venv --python /usr/local/bin/python \
     && uv pip install --python /opt/ai-lab-launcher-venv/bin/python /opt/ai-lab-template/launcher \
     && chmod +x /opt/ai-lab-template/docker/entrypoint.sh /opt/ai-lab-template/scripts/*.sh
 
