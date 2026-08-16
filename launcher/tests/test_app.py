@@ -26,6 +26,11 @@ def test_dashboard_health_and_project_flow(tmp_path: Path, monkeypatch) -> None:
     assert health.json()["tools"] >= 35
     assert dashboard.status_code == 200
     assert "AI Lab" in dashboard.text
+    assert "Ideogram 4" in dashboard.text
     assert "JoyAI-Video-Edit" in dashboard.text
+    assert "запуск готов" not in dashboard.text
+    assert "нужен первый ручной тест" not in dashboard.text
+    assert dashboard.text.index("1 · Image generation") < dashboard.text.index("2 · Image editing")
+    assert dashboard.text.index("2 · Image editing") < dashboard.text.index("12 · Acceleration")
     assert created.status_code == 200
     assert "real-test" in created.text

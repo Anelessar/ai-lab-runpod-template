@@ -44,9 +44,8 @@ main { width: min(1500px, 94vw); margin: 28px auto 80px; display: grid; gap: 38p
 .tool-head { display: flex; justify-content: space-between; gap: 12px; }
 .tool-head h3 { font-size: 21px; margin-bottom: 0; }
 .tool-card p { margin-bottom: 0; }
-.adapter, .chip { font-size: 12px; border: 1px solid var(--border); color: var(--muted); padding: 4px 8px; border-radius: 999px; white-space: nowrap; }
-.adapter.ready, .chip.ok { color: #a8f5d0; border-color: #276448; }
-.adapter.manual { color: #ffd59d; border-color: #785d32; }
+.chip { font-size: 12px; border: 1px solid var(--border); color: var(--muted); padding: 4px 8px; border-radius: 999px; white-space: nowrap; }
+.chip.ok { color: #a8f5d0; border-color: #276448; }
 .chip.live { color: #d9ccff; border-color: #6950b5; }
 .pipeline { border-left: 3px solid var(--accent); padding-left: 10px; color: #dce1e8; }
 .muted, .job { color: var(--muted); font-size: 13px; }

@@ -108,9 +108,6 @@
                     <p class="eyebrow">{{ tool.kind }} · {{ tool.priority }}</p>
                     <h3><a href="{{ tool.source_url }}" target="_blank">{{ tool.name }}</a></h3>
                   </div>
-                  <span class="adapter {{ tool.adapter_status }}">
-                    {% if tool.adapter_status == 'ready' %}запуск готов{% elif tool.adapter_status == 'catalogued' %}нужен первый ручной тест{% else %}ручная интеграция{% endif %}
-                  </span>
                 </div>
                 <p>{{ tool.description }}</p>
                 <div class="chips">

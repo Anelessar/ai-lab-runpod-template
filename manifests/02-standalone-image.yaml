@@ -1,4 +1,32 @@
 tools:
+  - id: ideogram-4
+    name: Ideogram 4
+    category: "1 · Image generation"
+    kind: standalone
+    description: Открытая 9.3B text-to-image модель Ideogram для типографики, сложного layout, JSON-промптов, цветовых палитр и изображений до 2K.
+    source_url: https://github.com/ideogram-oss/ideogram4
+    repo_url: https://github.com/ideogram-oss/ideogram4
+    priority: must
+    access: free
+    adapter_status: catalogued
+    license_note: Код Apache-2.0; веса Ideogram 4 доступны после принятия gated Non-Commercial лицензии. Для коммерческого использования нужна отдельная лицензия Ideogram.
+    requirements: ["24 GB VRAM для NF4", "HF_TOKEN и принятая лицензия модели"]
+    inputs: [text, json]
+    outputs: [image]
+    pipeline: "обычный prompt → Magic Prompt/свой LLM → structured JSON → Ideogram 4 NF4 → PNG → общая галерея"
+    install:
+      mode: git-auto
+      commands:
+        - "uv venv '{env_dir}' --python 3.12"
+        - "uv pip install --python '{env_dir}/bin/python' ."
+      instructions: Официальный inference-репозиторий устанавливается в отдельное окружение; затем используется run_inference.py.
+    models:
+      mode: huggingface
+      repo_ids: [ideogram-ai/ideogram-4-nf4]
+      instructions: Сначала принять лицензию ideogram-ai/ideogram-4-nf4 на Hugging Face и передать HF_TOKEN через RunPod Secret.
+      size_gb: 20
+    launch: {mode: disabled}
+
   - id: mage-flow
     name: Mage-Flow / Mage-Flow-Edit
     category: "1 · Image generation"

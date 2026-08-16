@@ -8,6 +8,13 @@ import yaml
 from pydantic import BaseModel, Field, HttpUrl, model_validator
 
 TOOL_ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+CATEGORY_NUMBER = re.compile(r"^\s*(\d+)\s*[·.]?")
+
+
+def category_sort_key(category: str) -> tuple[int, str]:
+    match = CATEGORY_NUMBER.match(category)
+    number = int(match.group(1)) if match else 10_000
+    return number, category.casefold()
 
 
 class CommandAction(BaseModel):
@@ -111,7 +118,10 @@ class ManifestRegistry:
         return self
 
     def all(self) -> list[ToolManifest]:
-        return sorted(self._tools.values(), key=lambda item: (item.category, item.name.lower()))
+        return sorted(
+            self._tools.values(),
+            key=lambda item: (category_sort_key(item.category), item.name.casefold()),
+        )
 
     def get(self, tool_id: str) -> ToolManifest:
         try:
@@ -120,4 +130,4 @@ class ManifestRegistry:
             raise KeyError(f"Unknown tool: {tool_id}") from exc
 
     def categories(self) -> list[str]:
-        return sorted({tool.category for tool in self._tools.values()})
+        return sorted({tool.category for tool in self._tools.values()}, key=category_sort_key)

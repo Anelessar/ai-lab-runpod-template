@@ -11,9 +11,16 @@ def test_all_manifests_are_valid_and_unique() -> None:
 
     assert len(tools) >= 35
     assert len({tool.id for tool in tools}) == len(tools)
-    assert {"z-image", "ltx-2-5", "scope", "joyai-video-edit", "indextts-2-5", "midashenglm-gen"} <= {
+    assert {"ideogram-4", "z-image", "ltx-2-5", "scope", "joyai-video-edit", "indextts-2-5", "midashenglm-gen"} <= {
         tool.id for tool in tools
     }
+
+
+def test_categories_are_sorted_by_their_number() -> None:
+    registry = ManifestRegistry(ROOT / "manifests").load()
+    numbers = [int(category.split("·", 1)[0].strip()) for category in registry.categories()]
+
+    assert numbers == sorted(numbers)
 
 
 def test_ready_comfyui_tools_have_downloadable_workflows() -> None:
