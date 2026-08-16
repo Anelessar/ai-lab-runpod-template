@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>AI Lab Launcher</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Одноразовая RunPod-сессия</p>
+      <h1>AI Lab</h1>
+      <p>ComfyUI и все бесплатные инструменты в одном рабочем пространстве.</p>
+    </div>
+    <nav>
+      <a class="button primary" href="{{ comfyui_url }}" target="_blank">Открыть ComfyUI</a>
+      <a class="button" href="{{ jupyter_url }}" target="_blank">Jupyter</a>
+      <a class="button" href="/projects/{{ active_project }}/export">Скачать проект ZIP</a>
+    </nav>
+  </header>
+
+  {% if message %}<div class="notice success">{{ message }}</div>{% endif %}
+  {% if error %}<div class="notice error">{{ error }}</div>{% endif %}
+
+  <main>
+    <section class="workspace card">
+      <div>
+        <h2>Активный проект</h2>
+        <form action="/projects/select" method="post" class="inline-form">
+          <select name="project_id">
+            {% for project in projects %}
+              <option value="{{ project }}" {% if project == active_project %}selected{% endif %}>{{ project }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit">Выбрать</button>
+        </form>
+      </div>
+      <div>
+        <h2>Новый проект</h2>
+        <form action="/projects" method="post" class="inline-form">
+          <input name="name" placeholder="product-ad-001" required>
+          <button type="submit">Создать</button>
+        </form>
+      </div>
+      <div>
+        <h2>Добавить файл</h2>
+        <form action="/projects/{{ active_project }}/upload" method="post" enctype="multipart/form-data" class="inline-form">
+          <input type="file" name="file" required>
+          <button type="submit">Загрузить</button>
+        </form>
+      </div>
+    </section>
+
+    {% if running %}
+      <div class="notice running">Сейчас работает: <strong>{{ running.tool_id }}</strong>, PID {{ running.pid }}</div>
+    {% endif %}
+
+    <section>
+      <div class="section-title">
+        <div><p class="eyebrow">Общая папка проекта</p><h2>Галерея и передача файлов</h2></div>
+        <span>{{ assets|length }} файлов</span>
+      </div>
+      {% if assets %}
+        <div class="asset-grid">
+          {% for asset in assets %}
+            <article class="asset card">
+              {% if asset.kind == 'image' %}
+                <img src="/files/{{ active_project }}/{{ asset.relative_path }}" alt="{{ asset.name }}">
+              {% elif asset.kind == 'video' %}
+                <video src="/files/{{ active_project }}/{{ asset.relative_path }}" controls></video>
+              {% elif asset.kind == 'audio' %}
+                <audio src="/files/{{ active_project }}/{{ asset.relative_path }}" controls></audio>
+              {% else %}
+                <div class="file-icon">FILE</div>
+              {% endif %}
+              <h3>{{ asset.name }}</h3>
+              <p class="muted">{{ asset.relative_path }} · {{ asset.size }}</p>
+              <form action="/projects/{{ active_project }}/send" method="post" class="send-form">
+                <input type="hidden" name="relative_path" value="{{ asset.relative_path }}">
+                <select name="target_tool">
+                  {% for target in all_tools %}<option value="{{ target.id }}">{{ target.name }}</option>{% endfor %}
+                </select>
+                <button type="submit">Передать в…</button>
+              </form>
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="empty">Добавь исходник или создай результат в ComfyUI — он появится здесь.</div>
+      {% endif %}
+    </section>
+
+    <section>
+      <div class="section-title">
+        <div><p class="eyebrow">Каталог</p><h2>Инструменты</h2></div>
+        <input id="tool-search" type="search" placeholder="Найти инструмент…">
+      </div>
+      {% for category, entries in categories.items() %}
+        <details class="category" open>
+          <summary>{{ category }} <span>{{ entries|length }}</span></summary>
+          <div class="tool-grid">
+            {% for entry in entries %}
+              {% set tool = entry.manifest %}{% set status = entry.status %}
+              <article class="tool-card card" data-search="{{ tool.name|lower }} {{ tool.description|lower }} {{ tool.category|lower }}">
+                <div class="tool-head">
+                  <div>
+                    <p class="eyebrow">{{ tool.kind }} · {{ tool.priority }}</p>
+                    <h3><a href="{{ tool.source_url }}" target="_blank">{{ tool.name }}</a></h3>
+                  </div>
+                  <span class="adapter {{ tool.adapter_status }}">
+                    {% if tool.adapter_status == 'ready' %}запуск готов{% elif tool.adapter_status == 'catalogued' %}нужен первый ручной тест{% else %}ручная интеграция{% endif %}
+                  </span>
+                </div>
+                <p>{{ tool.description }}</p>
+                <div class="chips">
+                  <span class="chip {% if status.installed %}ok{% endif %}">Программа: {% if status.installed %}готова{% else %}нет{% endif %}</span>
+                  <span class="chip {% if status.models %}ok{% endif %}">Модели: {% if status.models %}есть{% else %}нет{% endif %}</span>
+                  <span class="chip">{{ status.disk }} + {{ status.model_disk }}</span>
+                  {% if status.running %}<span class="chip live">Запущен</span>{% endif %}
+                </div>
+                <p class="pipeline"><strong>Pipeline:</strong> {{ tool.pipeline }}</p>
+                {% if tool.requirements %}<p class="muted"><strong>Нужно:</strong> {{ tool.requirements|join(' · ') }}</p>{% endif %}
+                <div class="actions">
+                  {% if tool.install.mode not in ['disabled', 'manual'] and not status.installed %}
+                    <form action="/tools/{{ tool.id }}/install" method="post"><button>Установить программу</button></form>
+                  {% endif %}
+                  {% if tool.models.mode not in ['disabled', 'manual'] and not status.models %}
+                    <form action="/tools/{{ tool.id }}/models" method="post"><button>Скачать модели</button></form>
+                  {% endif %}
+                  {% if tool.workflows and not status.workflows %}
+                    <form action="/tools/{{ tool.id }}/workflows" method="post"><button>Скачать workflow</button></form>
+                  {% endif %}
+                  {% if status.workflows %}
+                    {% for workflow in tool.workflows %}<a class="button" href="/workflows/{{ tool.id }}/{{ workflow.name }}">JSON: {{ workflow.name }}</a>{% endfor %}
+                  {% endif %}
+                  {% if tool.launch.mode in ['comfyui', 'web'] %}<a class="button" href="/tools/{{ tool.id }}/open" target="_blank">Открыть</a>{% endif %}
+                  {% if tool.launch.mode == 'process' and status.installed and not status.running %}
+                    <form action="/tools/{{ tool.id }}/launch" method="post"><button class="primary">Запустить</button></form>
+                  {% endif %}
+                  {% if status.running %}<form action="/tools/{{ tool.id }}/stop" method="post"><button>Остановить</button></form>{% endif %}
+                  {% if status.running and tool.launch.port %}<a class="button primary" href="/tools/{{ tool.id }}/open" target="_blank">Открыть UI</a>{% endif %}
+                </div>
+                {% if tool.run.mode == 'command' and status.installed %}
+                  <details class="run-form">
+                    <summary>Запустить обработку файла</summary>
+                    <form action="/tools/{{ tool.id }}/run" method="post">
+                      {% for field in tool.run.fields %}
+                        <label>{{ field.label }}
+                          {% if field.type == 'file' %}
+                            <select name="{{ field.name }}" {% if field.required %}required{% endif %}>
+                              <option value="">Выберите файл</option>
+                              {% for asset in assets %}<option value="{{ asset.relative_path }}">{{ asset.relative_path }}</option>{% endfor %}
+                            </select>
+                          {% elif field.type == 'textarea' %}
+                            <textarea name="{{ field.name }}" {% if field.required %}required{% endif %}>{{ field.default }}</textarea>
+                          {% else %}
+                            <input type="{{ field.type }}" name="{{ field.name }}" value="{{ field.default }}" {% if field.required %}required{% endif %}>
+                          {% endif %}
+                        </label>
+                      {% endfor %}
+                      <button class="primary" type="submit">Запустить задачу</button>
+                    </form>
+                  </details>
+                {% endif %}
+                <details class="instructions">
+                  <summary>Установка, модели и лицензия</summary>
+                  <p><strong>Программа:</strong> {{ tool.install.instructions or 'Встроено в общий runtime.' }}</p>
+                  <p><strong>Модели:</strong> {{ tool.models.instructions or 'Отдельные модели не требуются.' }}</p>
+                  <p><strong>Лицензия:</strong> {{ tool.license_note }}</p>
+                  {% if status.installed or status.models %}
+                    <div class="danger-actions">
+                      {% if status.models %}<form action="/tools/{{ tool.id }}/delete-models" method="post"><button>Удалить модели</button></form>{% endif %}
+                      {% if status.installed and tool.kind == 'standalone' %}<form action="/tools/{{ tool.id }}/delete-program" method="post"><button>Удалить программу</button></form>{% endif %}
+                    </div>
+                  {% endif %}
+                </details>
+                {% if status.latest_job %}<p class="job">Последняя задача: {{ status.latest_job.kind }} — {{ status.latest_job.status }} · <a href="/jobs/{{ status.latest_job.id }}" target="_blank">лог</a></p>{% endif %}
+              </article>
+            {% endfor %}
+          </div>
+        </details>
+      {% endfor %}
+    </section>
+
+    <section>
+      <div class="section-title"><div><p class="eyebrow">Фоновые операции</p><h2>Последние задачи</h2></div></div>
+      <div class="jobs card">
+        {% for job in jobs %}<div><code>{{ job.id }}</code> · {{ job.tool_id }} · {{ job.kind }} · <strong>{{ job.status }}</strong> · <a href="/jobs/{{ job.id }}" target="_blank">лог</a></div>{% else %}<p class="muted">Задач пока нет.</p>{% endfor %}
+      </div>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

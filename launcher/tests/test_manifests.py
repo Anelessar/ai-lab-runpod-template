@@ -1,0 +1,32 @@
+from pathlib import Path
+
+from app.manifest import ManifestRegistry
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_all_manifests_are_valid_and_unique() -> None:
+    registry = ManifestRegistry(ROOT / "manifests").load()
+    tools = registry.all()
+
+    assert len(tools) >= 35
+    assert len({tool.id for tool in tools}) == len(tools)
+    assert {"z-image", "ltx-2-5", "scope", "joyai-video-edit", "indextts-2-5", "midashenglm-gen"} <= {
+        tool.id for tool in tools
+    }
+
+
+def test_ready_comfyui_tools_have_downloadable_workflows() -> None:
+    registry = ManifestRegistry(ROOT / "manifests").load()
+    ready_comfy = [
+        tool for tool in registry.all() if tool.kind == "comfyui" and tool.adapter_status == "ready"
+    ]
+
+    assert ready_comfy
+    assert all(tool.workflows for tool in ready_comfy)
+    assert all(workflow.url or workflow.local_file for tool in ready_comfy for workflow in tool.workflows)
+
+
+def test_every_free_tool_has_a_concrete_pipeline() -> None:
+    registry = ManifestRegistry(ROOT / "manifests").load()
+    assert all(tool.pipeline.strip() for tool in registry.all() if tool.access == "free")

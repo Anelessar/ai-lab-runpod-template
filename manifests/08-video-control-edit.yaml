@@ -1,0 +1,171 @@
+tools:
+  - id: wan-animate-2
+    name: Wan-Animate-2
+    category: "8 · Video control and animation"
+    kind: standalone
+    description: End-to-end character animation/replacement по reference character и driving video с управлением ракурсом.
+    source_url: https://github.com/Wan-Video/Wan-Animate-2
+    repo_url: https://github.com/Wan-Video/Wan-Animate-2
+    priority: must
+    adapter_status: catalogued
+    requirements: ["несколько мощных GPU для Base", "NVIDIA GPU"]
+    inputs: [image, video, text]
+    outputs: [video]
+    pipeline: "character reference + driving video + prompt → Wan-Animate-2 → MP4"
+    install: {mode: git-auto, instructions: "Официальный Python/Gradio repo устанавливается отдельно; после clone фиксируется commit."}
+    models: {mode: manual, instructions: "Скачать Base либо 10-step Distilled checkpoint по официальному README."}
+    launch: {mode: disabled}
+
+  - id: interactavatar
+    name: InteractAvatar
+    category: "8 · Video control and animation"
+    kind: standalone
+    description: Talking-avatar модель для речи, действий и grounded-взаимодействия персонажа с объектами сцены.
+    source_url: https://github.com/angzong/InteractAvatar
+    repo_url: https://github.com/angzong/InteractAvatar
+    priority: must
+    adapter_status: catalogued
+    requirements: ["Wan2.2-TI2V-5B", "мощная NVIDIA GPU"]
+    inputs: [image, audio, text]
+    outputs: [video]
+    pipeline: "reference frame + action/audio → InteractAvatar → interaction MP4"
+    install: {mode: git-auto, instructions: "Официальный inference ставится в отдельное окружение."}
+    models: {mode: manual, instructions: "Скачать Wan base и InteractAvatar checkpoints по README."}
+    launch: {mode: disabled}
+
+  - id: cointeract
+    name: CoInteract
+    category: "8 · Video control and animation"
+    kind: standalone
+    description: Speech-driven взаимодействие человека с отдельным product reference, включая multi-clip и pose-driven режимы.
+    source_url: https://github.com/luoxyhappy/CoInteract
+    repo_url: https://github.com/luoxyhappy/CoInteract
+    priority: must
+    adapter_status: catalogued
+    requirements: ["около 59 GB VRAM для 720p", "Wan2.2-S2V-14B"]
+    inputs: [image, audio, text, pose]
+    outputs: [video]
+    pipeline: "person/product references + audio + prompt/pose → CoInteract → MP4"
+    install: {mode: git-auto, instructions: "Официальный batch inference устанавливается отдельно."}
+    models: {mode: manual, instructions: "Скачать Wan base, CoInteract weights и optional pose LoRA."}
+    launch: {mode: disabled}
+
+  - id: scope
+    name: SCoPE
+    category: "8 · Video control and animation"
+    kind: standalone
+    description: Self-contained Wan2.2-based I2V checkpoint для точной dolly/orbit/crane траектории камеры через camera-ray positional encoding.
+    source_url: https://visual-ai.github.io/scope/
+    repo_url: https://github.com/TencentARC/SCoPE
+    ref: 6658d0e286648b07aa9fd30932add53716deaee3
+    priority: must
+    adapter_status: ready
+    license_note: Apache 2.0; проверить лицензии входных данных и унаследованные ограничения Wan2.2.
+    requirements: ["около 67 GB checkpoint", "Python 3.11", "PyTorch 2.9.1 / CUDA 12.8"]
+    inputs: [image, text, camera_poses]
+    outputs: [video]
+    pipeline: "first frame + prompt + camera_poses.npy + FOV → SCoPE → 81-frame MP4"
+    install:
+      mode: git-auto
+      commands: ["uv sync"]
+      instructions: "Код и точное uv-окружение устанавливаются автоматически из закреплённого commit."
+    models:
+      mode: huggingface
+      repo_ids: [TencentARC/SCoPE]
+      size_gb: 67
+      instructions: "Кнопка скачивает self-contained checkpoint; отдельный Wan2.2 не нужен."
+    launch: {mode: disabled}
+    run:
+      mode: command
+      command: "uv run python inference.py --model_path '{model_dir}/TencentARC--SCoPE' --input_image {input_image} --prompt {prompt} --camera_path {camera_path} --x_fov {x_fov} --output_path {output_dir}/scope-{timestamp}.mp4"
+      fields:
+        - {name: input_image, label: Первый кадр, type: file}
+        - {name: prompt, label: Prompt, type: textarea}
+        - {name: camera_path, label: Camera poses .npy, type: file}
+        - {name: x_fov, label: Horizontal FOV в радианах, type: number, default: "1.11847"}
+
+  - id: joyai-video-edit
+    name: JoyAI-Video-Edit 0811
+    category: "9 · Video editing and effects"
+    kind: standalone
+    description: 16B streaming video-to-video editor для открытых текстовых правок live или загруженного видео без фиксированной длины.
+    source_url: https://github.com/jd-opensource/JoyAI-Video-Edit
+    repo_url: https://github.com/jd-opensource/JoyAI-Video-Edit
+    ref: 6134e39da9487d64a52c048d9bd1a370d3fb5c9b
+    priority: must
+    adapter_status: ready
+    license_note: Deployment-код и основная модель Apache 2.0; отдельно проверить лицензии MiMo-VL и входных материалов.
+    requirements: ["B200 либо RTX PRO 6000 Blackwell", "CUDA Toolkit 12.8", "примерно 51 GB checkpoints"]
+    inputs: [video, image, text]
+    outputs: [video]
+    pipeline: "MP4/live stream + instruction/reference → JoyAI WebSocket server → edited MP4"
+    install:
+      mode: git-auto
+      commands: ["bash '{template_root}/scripts/install-joyai.sh' '{tool_dir}' '{env_dir}'"]
+      instructions: "Tool-specific installer собирает CUDA 12.8 extensions под фактическую Blackwell GPU; первый запуск долгий."
+    models:
+      mode: commands
+      size_gb: 51
+      commands:
+        - "hf download jdopensource/JoyAI-Video-Edit --local-dir '{model_dir}/JoyAI-Video-Edit' --include 'dit/joyai_video_edit_dit_0811.pth' 'vae/*'"
+        - "hf download XiaomiMiMo/MiMo-VL-7B-RL-2508 --local-dir '{model_dir}/MiMo-VL-7B-RL-2508'"
+      instructions: "Скачиваются только актуальный DiT 0811, VAE и MiMo-VL; старый DiT 0804 пропускается."
+    launch:
+      mode: process
+      command: "JOYOMNI_FP8_IMG=0 JOYOMNI_FP8_TXT=0 JOYOMNI_SAGE_ATTN=0 JOYOMNI_DIT_CKPT='{model_dir}/JoyAI-Video-Edit/dit/joyai_video_edit_dit_0811.pth' JOYOMNI_VAE_CKPT='{model_dir}/JoyAI-Video-Edit/vae' JOYOMNI_TEXT_ENCODER_CKPT='{model_dir}/MiMo-VL-7B-RL-2508' JOYOMNI_RECORD_DIR='{project_dir}/runs/joyai-video-edit' JOYOMNI_HOST=0.0.0.0 JOYOMNI_PORT={port} bash deploy/run_server.sh"
+      port: 8080
+      path: /
+      health_path: /health
+
+  - id: v-rgbx
+    name: V-RGBX
+    category: "9 · Video editing and effects"
+    kind: standalone
+    description: Разложение видео на albedo, normals, material и irradiance с физически осмысленным редактированием.
+    source_url: https://github.com/Aleafy/V-RGBX
+    repo_url: https://github.com/Aleafy/V-RGBX
+    priority: must
+    adapter_status: catalogued
+    license_note: Только исследовательские/некоммерческие тесты без отдельного разрешения авторов.
+    requirements: ["Wan2.1-T2V-1.3B", "NVIDIA GPU"]
+    inputs: [video, image, text]
+    outputs: [video, maps]
+    pipeline: "video + edit/reference/maps → V-RGBX inverse/forward render → MP4"
+    install: {mode: git-auto, instructions: "Официальный Python framework ставится в отдельное окружение."}
+    models: {mode: manual, instructions: "Скачать Wan2.1 base и V-RGBX checkpoints."}
+    launch: {mode: disabled}
+
+  - id: reco
+    name: ReCo / ReCo_Ref
+    category: "9 · Video editing and effects"
+    kind: standalone
+    description: Instruction/reference video editing adapters для removal, replacement, addition и style propagation.
+    source_url: https://github.com/HiDream-ai/ReCo
+    repo_url: https://github.com/HiDream-ai/ReCo
+    priority: must
+    adapter_status: catalogued
+    requirements: ["Wan2.1-VACE-1.3B", "NVIDIA GPU"]
+    inputs: [video, mask, image, text]
+    outputs: [video]
+    pipeline: "video + mask/instruction/reference → ReCo → edited MP4"
+    install: {mode: git-auto, instructions: "Официальные inference scripts устанавливаются отдельно."}
+    models: {mode: manual, instructions: "Скачать VACE base и ReCo/ReCo_Ref adapters."}
+    launch: {mode: disabled}
+
+  - id: matanyone2
+    name: MatAnyone2
+    category: "9 · Video editing and effects"
+    kind: standalone
+    description: Temporal human video matting с устойчивой alpha-mask и сохранением тонких деталей.
+    source_url: https://github.com/pq-yang/MatAnyone2
+    repo_url: https://github.com/pq-yang/MatAnyone2
+    priority: must
+    adapter_status: catalogued
+    license_note: Только некоммерческое использование без отдельного разрешения.
+    requirements: ["NVIDIA GPU"]
+    inputs: [video, mask]
+    outputs: [video, alpha]
+    pipeline: "video + first-frame mask → foreground + alpha → ComfyUI composite"
+    install: {mode: git-auto, instructions: "Официальный CLI/Python/Gradio ставится в отдельное окружение."}
+    models: {mode: manual, instructions: "Скачать MatAnyone2 checkpoint по README."}
+    launch: {mode: disabled}

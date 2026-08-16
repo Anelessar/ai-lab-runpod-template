@@ -1,0 +1,278 @@
+tools:
+  - id: z-image
+    name: Z-Image / Turbo
+    category: "1 · Image generation"
+    kind: comfyui
+    description: Компактная локальная text-to-image модель; полный checkpoint нужен для качества и LoRA, Turbo — для быстрых итераций.
+    source_url: https://github.com/Tongyi-MAI/Z-Image
+    priority: must
+    adapter_status: ready
+    requirements: ["16+ GB VRAM для Turbo", "NVIDIA GPU"]
+    inputs: [text]
+    outputs: [image]
+    pipeline: "prompt → Z-Image/Turbo → VAE Decode → PNG → общая галерея"
+    install: {mode: disabled, instructions: "Поддержка входит в актуальный ComfyUI."}
+    models: {mode: manual, instructions: "Скачать diffusion model, Qwen text encoder и VAE через Hugging Face Download Manager в папки, указанные внутри workflow."}
+    launch: {mode: comfyui}
+    workflows:
+      - {name: image_z_image, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_z_image.json}
+      - {name: image_z_image_turbo, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_z_image_turbo.json}
+
+  - id: qwen-image-2512
+    name: Qwen-Image-2512
+    category: "1 · Image generation"
+    kind: comfyui
+    description: Открытая 20B text-to-image модель для реалистичных людей, сложных prompts и текста в изображении.
+    source_url: https://huggingface.co/Qwen/Qwen-Image-2512
+    priority: must
+    adapter_status: ready
+    requirements: ["мощная NVIDIA GPU", "quantization при недостатке VRAM"]
+    inputs: [text]
+    outputs: [image]
+    pipeline: "prompt → Qwen-Image-2512 → OCR/SKU QA → PNG"
+    install: {mode: disabled, instructions: "Использует core nodes актуального ComfyUI."}
+    models: {mode: manual, instructions: "Скачать файлы из Qwen/Comfy-Org через Hugging Face Download Manager по ссылкам внутри workflow."}
+    launch: {mode: comfyui}
+    workflows:
+      - {name: image_qwen_2512, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_Image_2512.json}
+
+  - id: flux2-klein
+    name: FLUX.2 Klein
+    category: "1 · Image generation"
+    kind: comfyui
+    description: Локальная быстрая ветка FLUX.2 для генерации и редактирования; Pro/Max/Flex в этот бесплатный runtime не входят.
+    source_url: https://help.bfl.ai/articles/7655484417-what-flux-models-are-available
+    priority: must
+    adapter_status: ready
+    requirements: ["NVIDIA GPU"]
+    inputs: [text, image]
+    outputs: [image]
+    pipeline: "prompt/references → FLUX.2 Klein → QA → PNG"
+    install: {mode: disabled, instructions: "Использует core nodes актуального ComfyUI."}
+    models: {mode: manual, instructions: "Скачать выбранный Klein checkpoint и encoders через Hugging Face Download Manager."}
+    launch: {mode: comfyui}
+    workflows:
+      - {name: flux2_klein_t2i, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_text_to_image.json}
+      - {name: flux2_klein_edit, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_image_edit_4b_distilled.json}
+
+  - id: realgen-v2
+    name: RealGen V2
+    category: "1 · Image generation"
+    kind: modifier
+    description: Realism-LoRA для Z-Image, а не самостоятельный генератор.
+    source_url: https://github.com/yejy53/RealGen
+    priority: must
+    adapter_status: catalogued
+    requirements: ["Z-Image base", "совместимый LoRA loader"]
+    inputs: [text]
+    outputs: [image]
+    pipeline: "prompt → Z-Image + RealGen LoRA → A/B с чистой базой"
+    install: {mode: disabled, instructions: "Код обучения не нужен; LoRA подключается внутри ComfyUI."}
+    models: {mode: manual, instructions: "Скачать RealGen V2 LoRA и положить в models/loras; базовый Z-Image хранится отдельно."}
+    launch: {mode: comfyui}
+
+  - id: freefuse
+    name: FreeFuse
+    category: "1 · Image generation"
+    kind: modifier
+    description: Training-free маршрутизация нескольких subject-LoRA в одной сцене.
+    source_url: https://github.com/yaoliliu/FreeFuse
+    repo_url: https://github.com/yaoliliu/FreeFuse
+    priority: must
+    adapter_status: manual
+    requirements: ["совместимая база", "2+ subject LoRA"]
+    inputs: [text, lora]
+    outputs: [image]
+    pipeline: "base + несколько LoRA → FreeFuse routing → sampler → PNG"
+    install: {mode: manual, instructions: "Установить ветку comfyui через ComfyUI Manager; версия должна совпадать с текущей базой."}
+    models: {mode: manual, instructions: "Скачать базовую модель и subject-LoRA вручную."}
+    launch: {mode: comfyui}
+
+  - id: lucida-v7
+    name: Lucida v7
+    category: "2 · Image editing"
+    kind: comfyui
+    description: Специализированное удаление фона и matting для стекла, текста, логотипов и сложных продуктовых краёв.
+    source_url: https://github.com/egeorcun/lucida
+    priority: must
+    adapter_status: catalogued
+    requirements: ["NVIDIA GPU или CPU"]
+    inputs: [image]
+    outputs: [image, mask]
+    pipeline: "image → Lucida → RGBA + mask → composite/inpaint"
+    install: {mode: disabled, instructions: "Использовать background-removal nodes актуального ComfyUI."}
+    models: {mode: manual, instructions: "Скачать lucida.safetensors в models/background_removal."}
+    launch: {mode: comfyui}
+
+  - id: qwen-image-edit-2511
+    name: Qwen-Image-Edit-2511
+    category: "2 · Image editing"
+    kind: comfyui
+    description: Локальный instruction editor для точечных и глобальных правок изображения.
+    source_url: https://huggingface.co/Qwen/Qwen-Image-Edit-2511
+    priority: must
+    adapter_status: ready
+    requirements: ["мощная NVIDIA GPU"]
+    inputs: [image, text]
+    outputs: [image]
+    pipeline: "image + инструкция → Qwen Edit 2511 → comparison → PNG"
+    install: {mode: disabled, instructions: "Использует core nodes актуального ComfyUI."}
+    models: {mode: manual, instructions: "Скачать checkpoint/encoders по ссылкам внутри workflow."}
+    launch: {mode: comfyui}
+    workflows:
+      - {name: qwen_edit_2511, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_edit_2511.json}
+
+  - id: qwen-image-layered
+    name: Qwen-Image-Layered
+    category: "2 · Image editing"
+    kind: comfyui
+    description: Декомпозиция плоского изображения на отдельные RGBA-слои.
+    source_url: https://huggingface.co/Qwen/Qwen-Image-Layered
+    priority: must
+    adapter_status: ready
+    requirements: ["мощная NVIDIA GPU"]
+    inputs: [image]
+    outputs: [image, layers]
+    pipeline: "flattened image → Qwen Layered → RGBA layers → ReDesign/ручная правка"
+    install: {mode: disabled, instructions: "Использует core nodes актуального ComfyUI."}
+    models: {mode: manual, instructions: "Скачать layered checkpoint и зависимости по ссылкам workflow."}
+    launch: {mode: comfyui}
+    workflows:
+      - {name: qwen_image_layered, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_qwen_image_layered.json}
+
+  - id: genfocus
+    name: Genfocus
+    category: "2 · Image editing"
+    kind: modifier
+    description: Специализированный deblur/refocus/bokeh pipeline для исправления глубины резкости.
+    source_url: https://github.com/rayray9999/Genfocus
+    repo_url: https://github.com/rayray9999/Genfocus
+    priority: must
+    adapter_status: manual
+    requirements: ["comfyui-refocus custom node"]
+    inputs: [image]
+    outputs: [image]
+    pipeline: "image → DeblurNet/BokehNet → refocused image"
+    install: {mode: manual, instructions: "Установить comfyui-refocus через ComfyUI Manager по инструкции авторов."}
+    models: {mode: manual, instructions: "Скачать DeblurNet/BokehNet checkpoints, указанные репозиторием."}
+    launch: {mode: comfyui}
+
+  - id: minimax-h3
+    name: MiniMax H3
+    category: "7 · Video generation"
+    kind: comfyui
+    description: Open-weights video+audio модель с T2V, I2V, R2V и синхронным stereo audio.
+    source_url: https://huggingface.co/MiniMaxAI/MiniMax-H3
+    priority: must
+    adapter_status: ready
+    requirements: ["80 GB-class GPU либо quantized workflow"]
+    inputs: [text, image, video, audio]
+    outputs: [video, audio]
+    pipeline: "multimodal guides → MiniMax H3 → video/audio decode → MP4"
+    install: {mode: disabled, instructions: "Поддержка и шаблоны входят в актуальный ComfyUI."}
+    models: {mode: manual, instructions: "Скачать diffusion model, text encoder, video VAE и audio VAE через Hugging Face Download Manager."}
+    launch: {mode: comfyui}
+    workflows:
+      - {name: minimax_h3_t2v, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_minimax_h3_t2v.json}
+      - {name: minimax_h3_i2v, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_minimax_h3_i2v.json}
+      - {name: minimax_h3_r2v, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_minimax_h3_r2v.json}
+
+  - id: ltx-2-5
+    name: LTX-2.5
+    category: "7 · Video generation"
+    kind: comfyui
+    description: Локальная video+audio модель с multishot, editing и HDR/EXR-oriented pipeline.
+    source_url: https://huggingface.co/Lightricks/LTX-2.5
+    priority: must
+    adapter_status: ready
+    requirements: ["мощная NVIDIA GPU"]
+    inputs: [text, image, audio]
+    outputs: [video, audio]
+    pipeline: "prompt/frames/audio → LTX-2.5 → video/audio → MP4"
+    install: {mode: disabled, instructions: "Использует официальные LTXVideo nodes актуального ComfyUI."}
+    models: {mode: manual, instructions: "Принять лицензию Hugging Face и скачать выбранный checkpoint через Download Manager."}
+    launch: {mode: comfyui}
+    workflows:
+      - {name: ltx25_t2v, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_ltx2_5_t2v.json}
+      - {name: ltx25_i2v, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_ltx2_5_i2v.json}
+      - {name: ltx25_flf2v, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/video_ltx2_5_flf2v.json}
+
+  - id: scail-2
+    name: SCAIL-2
+    category: "8 · Video control and animation"
+    kind: modifier
+    description: Wan-based character animation/replacement с multi-reference и сложными движениями.
+    source_url: https://github.com/zai-org/SCAIL-2
+    priority: must
+    adapter_status: manual
+    requirements: ["WanVideoWrapper", "мощная NVIDIA GPU"]
+    inputs: [image, video, mask]
+    outputs: [video]
+    pipeline: "references + driving/pose video + masks → SCAIL-2 → MP4"
+    install: {mode: manual, instructions: "Установить Kijai WanVideoWrapper и SCAIL-2 integration по официальной инструкции."}
+    models: {mode: manual, instructions: "Скачать SCAIL-2 и подходящую Wan base через Hugging Face Download Manager."}
+    launch: {mode: comfyui}
+
+  - id: flashportrait
+    name: FlashPortrait
+    category: "8 · Video control and animation"
+    kind: modifier
+    description: Identity-preserving portrait animation для длинных talking portraits.
+    source_url: https://francis-rings.github.io/FlashPortrait/
+    priority: must
+    adapter_status: manual
+    requirements: ["Wan2.1-I2V-14B", "community ComfyUI node"]
+    inputs: [image, video]
+    outputs: [video]
+    pipeline: "portrait + driving video → FlashPortrait → face QA → MP4"
+    install: {mode: manual, instructions: "Установить ComfyUI-FlashPortrait, на который ссылаются авторы."}
+    models: {mode: manual, instructions: "Скачать Wan base и FlashPortrait weights."}
+    launch: {mode: comfyui}
+
+  - id: time-to-move
+    name: Time-to-Move
+    category: "8 · Video control and animation"
+    kind: modifier
+    description: Mask/drag/camera control для Wan2.2 I2V без обучения отдельной модели.
+    source_url: https://github.com/time-to-move/TTM
+    priority: must
+    adapter_status: manual
+    requirements: ["WanVideoWrapper", "Wan2.2 I2V"]
+    inputs: [image, mask, trajectory]
+    outputs: [video]
+    pipeline: "image + mask + drag/camera paths → Wan2.2 + TTM → MP4"
+    install: {mode: manual, instructions: "Использовать TTM nodes/workflows внутри актуального WanVideoWrapper."}
+    models: {mode: manual, instructions: "Скачать совместимую Wan2.2 I2V модель."}
+    launch: {mode: comfyui}
+
+  - id: turbodiffusion
+    name: TurboDiffusion
+    category: "12 · Acceleration"
+    kind: modifier
+    description: Ускоренные checkpoints и inference для конкретных Wan2.1/Wan2.2 workflow.
+    source_url: https://github.com/thu-ml/TurboDiffusion
+    priority: mid
+    adapter_status: manual
+    requirements: ["строго совпадающий Wan checkpoint"]
+    inputs: [text, image]
+    outputs: [video]
+    pipeline: "Wan input → TurboDiffusion sampler/checkpoint → A/B quality test"
+    install: {mode: manual, instructions: "Установить community Comfyui_turbodiffusion через Manager."}
+    models: {mode: manual, instructions: "Скачать checkpoint, точно соответствующий выбранной Wan base."}
+    launch: {mode: comfyui}
+
+  - id: mrflow
+    name: MrFlow
+    category: "12 · Acceleration"
+    kind: modifier
+    description: Training-free multi-resolution acceleration для поддерживаемых image flow/diffusion моделей.
+    source_url: https://github.com/Xingyu-Zheng/MrFlow
+    priority: mid
+    adapter_status: manual
+    requirements: ["поддерживаемая Qwen/Image base"]
+    inputs: [text, image]
+    outputs: [image]
+    pipeline: "обычный prompt/conditions → MrFlow sampler → A/B quality test"
+    install: {mode: manual, instructions: "Скопировать официальный ComfyUI-MrFlow plugin и установить его зависимости."}
+    models: {mode: manual, instructions: "Использует модель базового workflow; отдельный универсальный checkpoint отсутствует."}
+    launch: {mode: comfyui}

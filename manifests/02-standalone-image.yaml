@@ -1,0 +1,182 @@
+tools:
+  - id: mage-flow
+    name: Mage-Flow / Mage-Flow-Edit
+    category: "1 · Image generation"
+    kind: standalone
+    description: Компактная линейка Microsoft для text-to-image и instruction editing, включая четырёхшаговые Turbo checkpoints.
+    source_url: https://microsoft.github.io/Mage/flow/
+    repo_url: https://github.com/microsoft/Mage
+    priority: must
+    adapter_status: catalogued
+    requirements: ["18–20 GB VRAM для BF16", "NVIDIA GPU"]
+    inputs: [text, image]
+    outputs: [image]
+    pipeline: "prompt/image + инструкция → Mage checkpoint → PNG → ComfyUI"
+    install: {mode: git-auto, instructions: "Код устанавливается в отдельное uv-окружение; после клонирования фиксируется фактический commit."}
+    models: {mode: manual, instructions: "Выбрать Base/RL/Turbo/Edit checkpoint по официальному Model Zoo и скачать в папку модели Mage."}
+    launch: {mode: disabled}
+
+  - id: ernie-image
+    name: ERNIE-Image 8B / Turbo
+    category: "1 · Image generation"
+    kind: standalone
+    description: Локальная image-модель Baidu с сильным текстом/layout и быстрой Turbo-веткой.
+    source_url: https://github.com/baidu/ernie-image
+    repo_url: https://github.com/baidu/ernie-image
+    priority: mid
+    adapter_status: catalogued
+    requirements: ["NVIDIA GPU"]
+    inputs: [text]
+    outputs: [image]
+    pipeline: "prompt → ERNIE Turbo/full → OCR → PNG → ComfyUI"
+    install: {mode: git-auto, instructions: "Официальный репозиторий и зависимости устанавливаются отдельно от Launcher."}
+    models: {mode: manual, instructions: "Скачать официальный ERNIE-Image checkpoint по инструкции репозитория."}
+    launch: {mode: disabled}
+
+  - id: asymflow
+    name: AsymFlow
+    category: "1 · Image generation"
+    kind: standalone
+    description: Экспериментальная pixel-space flow ветка вокруг FLUX.2 Klein для быстрого локального generation.
+    source_url: https://hanshengchen.com/asymflow/
+    repo_url: https://github.com/Lakonik/LakonLab
+    priority: mid
+    adapter_status: catalogued
+    requirements: ["FLUX.2 Klein", "NVIDIA GPU"]
+    inputs: [text]
+    outputs: [image]
+    pipeline: "prompt → AsymFlow/FLUX.2 Klein → PNG → comparison"
+    install: {mode: git-auto, instructions: "Устанавливается LakonLab; конкретный AsymFlow config выбирается после установки."}
+    models: {mode: manual, instructions: "Скачать checkpoint и базовые зависимости из официальной документации AsymFlow."}
+    launch: {mode: disabled}
+
+  - id: redesign
+    name: ReDesign
+    category: "2 · Image editing"
+    kind: standalone
+    description: Агентный pipeline, превращающий flattened raster design в иерархию текста, объектов и редактируемых слоёв.
+    source_url: https://github.com/jintae-00/ReDesign
+    repo_url: https://github.com/jintae-00/ReDesign
+    priority: must
+    adapter_status: catalogued
+    requirements: ["80 GB-class GPU", "локальный или OpenAI-compatible VLM"]
+    inputs: [image]
+    outputs: [image, layers, json]
+    pipeline: "design PNG → OCR/VLM/segmentation/Qwen Layered → JSON + layers"
+    install: {mode: git-auto, instructions: "Репозиторий ставится отдельно; VLM endpoint и auxiliary models настраиваются после установки."}
+    models: {mode: manual, instructions: "Скачать Qwen-Image-Layered, segmentation/inpainting и остальные зависимости по README."}
+    launch: {mode: disabled}
+
+  - id: spatialedit
+    name: SpatialEdit
+    category: "2 · Image editing"
+    kind: standalone
+    description: 16B checkpoint для перемещения, вращения и изменения viewpoint отдельных объектов.
+    source_url: https://github.com/EasonXiao-888/SpatialEdit
+    repo_url: https://github.com/EasonXiao-888/SpatialEdit
+    priority: must
+    adapter_status: catalogued
+    requirements: ["мощная NVIDIA GPU"]
+    inputs: [image, text]
+    outputs: [image]
+    pipeline: "image + spatial instruction → SpatialEdit → PNG → QA"
+    install: {mode: git-auto, instructions: "Официальный Python pipeline устанавливается в изолированное окружение."}
+    models: {mode: manual, instructions: "Скачать SpatialEdit-16B weights и указать путь в demo config."}
+    launch: {mode: disabled}
+
+  - id: hifi-inpaint
+    name: HiFi-Inpaint
+    category: "2 · Image editing"
+    kind: standalone
+    description: Reference-guided inpainting с отдельными condition image, mask и prompt.
+    source_url: https://github.com/Correr-Zhou/HiFi-Inpaint
+    repo_url: https://github.com/Correr-Zhou/HiFi-Inpaint
+    priority: must
+    adapter_status: catalogued
+    requirements: ["NVIDIA GPU"]
+    inputs: [image, mask, reference, text]
+    outputs: [image]
+    pipeline: "image + mask + reference + prompt → HiFi-Inpaint → PNG"
+    install: {mode: git-auto, instructions: "Официальный inference/Gradio устанавливается в отдельное окружение."}
+    models: {mode: manual, instructions: "Скачать базовую FLUX-модель и HiFi-Inpaint checkpoints согласно README."}
+    launch: {mode: disabled}
+
+  - id: hunyuanimage-3-instruct
+    name: HunyuanImage-3.0-Instruct
+    category: "2 · Image editing"
+    kind: standalone
+    description: Большая instruction-based image модель Tencent для сложных правок и multi-GPU inference.
+    source_url: https://huggingface.co/tencent/HunyuanImage-3.0-Instruct
+    priority: must
+    adapter_status: manual
+    requirements: ["несколько мощных GPU"]
+    inputs: [image, text]
+    outputs: [image]
+    pipeline: "image + инструкция → HunyuanImage Instruct → PNG → QA"
+    install: {mode: manual, instructions: "Использовать официальный inference-код, указанный в model card; отдельного стабильного WebUI adapter пока нет."}
+    models: {mode: manual, instructions: "Скачать checkpoint с Hugging Face вручную после проверки требований к GPU."}
+    launch: {mode: disabled}
+
+  - id: windowseat
+    name: WindowSeat v1.0
+    category: "2 · Image editing"
+    kind: standalone
+    description: Узкая модель удаления отражений со стекла и окон.
+    source_url: https://huggingface.co/huawei-bayerlab/windowseat-reflection-removal-v1-0
+    priority: must
+    adapter_status: manual
+    requirements: ["NVIDIA GPU"]
+    inputs: [image]
+    outputs: [image]
+    pipeline: "photo through glass → WindowSeat → reflection-free PNG → QA"
+    install: {mode: manual, instructions: "Запускается официальным inference из model card; отдельного репозитория с универсальным WebUI нет."}
+    models: {mode: manual, instructions: "Скачать Huawei BayerLab checkpoint вручную."}
+    launch: {mode: disabled}
+
+  - id: vibe-2b
+    name: VIBE 2B
+    category: "2 · Image editing"
+    kind: standalone
+    description: Компактный instruction-based image editor с открытыми Hugging Face checkpoints.
+    source_url: https://riko0.github.io/VIBE/
+    priority: must
+    adapter_status: manual
+    requirements: ["NVIDIA GPU"]
+    inputs: [image, text]
+    outputs: [image]
+    pipeline: "image + инструкция → VIBE → PNG → comparison"
+    install: {mode: manual, instructions: "Использовать официальный Hugging Face Space или model-card inference; стабильного отдельного repo installer нет."}
+    models: {mode: manual, instructions: "Скачать iitolstykh/VIBE-Image-Edit либо DistilledCFG checkpoint."}
+    launch: {mode: disabled}
+
+  - id: unigenddet
+    name: UniGenDet
+    category: "2 · Image editing"
+    kind: standalone
+    description: Unified generation/detection research pipeline, полезный как специализированная evaluation/editing ветка.
+    source_url: https://github.com/Zhangyr2022/UniGenDet
+    repo_url: https://github.com/Zhangyr2022/UniGenDet
+    priority: must
+    adapter_status: catalogued
+    requirements: ["BAGEL checkpoint", "NVIDIA GPU"]
+    inputs: [text, image]
+    outputs: [image, json]
+    pipeline: "prompt/image → UniGenDet generation/detection mode → PNG/JSON"
+    install: {mode: git-auto, instructions: "Код устанавливается автоматически; выбранный generation/detection preset настраивается по README."}
+    models: {mode: manual, instructions: "Скачать совместимый BAGEL checkpoint в папку pretrained."}
+    launch: {mode: disabled}
+
+  - id: gen-searcher
+    name: GenSearcher
+    category: "3 · Image evaluation and search"
+    kind: web
+    description: Web-only поиск/сравнение генеративных результатов; локальной модели и API-интеграции не требует.
+    source_url: https://gen-searcher.vercel.app/
+    priority: must
+    adapter_status: ready
+    inputs: [text]
+    outputs: [data]
+    pipeline: "поисковый запрос → web UI → сохранить находки в brief"
+    install: {mode: disabled, instructions: "Работает в браузере."}
+    models: {mode: disabled, instructions: "Моделей нет."}
+    launch: {mode: web}
