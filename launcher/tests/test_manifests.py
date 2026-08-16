@@ -23,6 +23,18 @@ def test_categories_are_sorted_by_their_number() -> None:
     assert numbers == sorted(numbers)
 
 
+def test_asymflow_is_a_comfyui_adapter_with_a_baseline_workflow() -> None:
+    registry = ManifestRegistry(ROOT / "manifests").load()
+    asymflow = registry.get("asymflow")
+
+    assert asymflow.kind == "comfyui"
+    assert asymflow.install.mode == "disabled"
+    assert {workflow.name for workflow in asymflow.workflows} == {
+        "asymflow_flux2_klein_9b",
+        "baseline_flux2_klein_9b_base",
+    }
+
+
 def test_ready_comfyui_tools_have_downloadable_workflows() -> None:
     registry = ManifestRegistry(ROOT / "manifests").load()
     ready_comfy = [

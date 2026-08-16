@@ -55,6 +55,28 @@ tools:
       - {name: flux2_klein_t2i, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_text_to_image.json}
       - {name: flux2_klein_edit, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_klein_image_edit_4b_distilled.json}
 
+  - id: asymflow
+    name: AsymFlow / AsymFLUX.2 Klein 9B
+    category: "1 · Image generation"
+    kind: comfyui
+    description: "Pixel-space адаптер для FLUX.2 Klein Base 9B. Это не отдельная программа: ComfyUI-piFlow меняет способ генерации Klein и добавляет AsymFlow scheduler, Oklab pixel-space VAE и live pixel preview."
+    source_url: https://github.com/Lakonik/ComfyUI-piFlow
+    repo_url: https://github.com/Lakonik/ComfyUI-piFlow
+    ref: 1e161f39ef4bf04c9033ed6a6cdc4d8373cc9e72
+    priority: must
+    adapter_status: ready
+    license_note: "ComfyUI-ноды — Apache-2.0; FLUX.2 Klein 9B и AsymFlow adapter — FLUX Non-Commercial License. Для коммерческого использования нужна отдельная лицензия."
+    requirements: ["FLUX.2 Klein Base 9B", "Qwen3 8B encoder", "32+ GB VRAM желательно; на меньшей VRAM — GGUF/offload"]
+    inputs: [text]
+    outputs: [image]
+    pipeline: "один prompt → AsymFlow 9B и обычный Klein Base 9B → по 4 одинаковых теста → сравнение реализма, деталей, текста и разнообразия"
+    install: {mode: disabled, instructions: "ComfyUI-piFlow v1.3.4 уже встроен в AI Lab image как custom node; отдельная Python-программа и отдельный UI не нужны."}
+    models: {mode: manual, instructions: "Общие с Klein: flux-2-klein-base-9b-fp8.safetensors → models/diffusion_models и qwen_3_8b_fp8mixed.safetensors → models/text_encoders. Только для AsymFlow: diffusion_pytorch_model.safetensors из Lakonik/AsymFLUX.2-klein-9B переименовать в asymflux2_klein_9b.safetensors и положить в models/loras. Для обычного Klein baseline дополнительно нужен full_encoder_small_decoder.safetensors в models/vae. BFL checkpoint gated: сначала принять FLUX license на Hugging Face."}
+    launch: {mode: comfyui}
+    workflows:
+      - {name: asymflow_flux2_klein_9b, url: https://raw.githubusercontent.com/Lakonik/ComfyUI-piFlow/main/workflows/asymflux2_klein_9b.json}
+      - {name: baseline_flux2_klein_9b_base, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_text_to_image_9b.json}
+
   - id: realgen-v2
     name: RealGen V2
     category: "1 · Image generation"

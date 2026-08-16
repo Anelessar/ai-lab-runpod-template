@@ -61,23 +61,6 @@ tools:
     models: {mode: manual, instructions: "Скачать официальный ERNIE-Image checkpoint по инструкции репозитория."}
     launch: {mode: disabled}
 
-  - id: asymflow
-    name: AsymFlow
-    category: "1 · Image generation"
-    kind: standalone
-    description: Экспериментальная pixel-space flow ветка вокруг FLUX.2 Klein для быстрого локального generation.
-    source_url: https://hanshengchen.com/asymflow/
-    repo_url: https://github.com/Lakonik/LakonLab
-    priority: mid
-    adapter_status: catalogued
-    requirements: ["FLUX.2 Klein", "NVIDIA GPU"]
-    inputs: [text]
-    outputs: [image]
-    pipeline: "prompt → AsymFlow/FLUX.2 Klein → PNG → comparison"
-    install: {mode: git-auto, instructions: "Устанавливается LakonLab; конкретный AsymFlow config выбирается после установки."}
-    models: {mode: manual, instructions: "Скачать checkpoint и базовые зависимости из официальной документации AsymFlow."}
-    launch: {mode: disabled}
-
   - id: redesign
     name: ReDesign
     category: "2 · Image editing"

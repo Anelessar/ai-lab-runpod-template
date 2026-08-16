@@ -107,7 +107,15 @@
                 </div>
                 <p>{{ tool.description }}</p>
                 <div class="chips">
-                  <span class="chip {% if status.installed %}ok{% endif %}">Программа: {% if status.installed %}готова{% else %}нет{% endif %}</span>
+                  {% if tool.kind == 'comfyui' %}
+                    <span class="chip {% if status.installed %}ok{% endif %}">ComfyUI: {% if status.installed %}готов{% else %}не готов{% endif %}</span>
+                  {% elif tool.kind == 'modifier' %}
+                    <span class="chip {% if status.installed %}ok{% endif %}">Модуль: {% if status.installed %}готов{% else %}не готов{% endif %}</span>
+                  {% elif tool.kind == 'web' %}
+                    <span class="chip {% if status.installed %}ok{% endif %}">Сервис: {% if status.installed %}доступен{% else %}недоступен{% endif %}</span>
+                  {% else %}
+                    <span class="chip {% if status.installed %}ok{% endif %}">Программа: {% if status.installed %}готова{% else %}нет{% endif %}</span>
+                  {% endif %}
                   <span class="chip {% if status.models %}ok{% endif %}">Модели: {% if status.models %}есть{% else %}нет{% endif %}</span>
                   <span class="chip">{{ status.disk }} + {{ status.model_disk }}</span>
                   {% if status.running %}<span class="chip live">Запущен</span>{% endif %}

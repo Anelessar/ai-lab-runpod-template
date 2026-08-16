@@ -2,6 +2,7 @@ ARG RUNPOD_BASE=runpod/pytorch:1.1.0-cu1281-torch280-ubuntu2204
 FROM ${RUNPOD_BASE}
 
 ARG COMFYUI_REF=b963f4ad210a42841ab23dfc28a84143a0cce227
+ARG COMFYUI_PIFLOW_REF=1e161f39ef4bf04c9033ed6a6cdc4d8373cc9e72
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONUNBUFFERED=1 \
@@ -18,6 +19,8 @@ RUN python3 -m pip install --no-cache-dir --upgrade pip uv
 
 RUN git clone --filter=blob:none https://github.com/Comfy-Org/ComfyUI.git /opt/ComfyUI \
     && git -C /opt/ComfyUI checkout ${COMFYUI_REF} \
+    && git clone --filter=blob:none https://github.com/Lakonik/ComfyUI-piFlow.git /opt/ComfyUI/custom_nodes/ComfyUI-piFlow \
+    && git -C /opt/ComfyUI/custom_nodes/ComfyUI-piFlow checkout ${COMFYUI_PIFLOW_REF} \
     && uv pip install --system -r /opt/ComfyUI/requirements.txt \
     && uv pip install --system "huggingface_hub[cli]" jupyterlab
 
