@@ -41,7 +41,7 @@ def test_runpod_template_maps_existing_hf_secret() -> None:
         encoding="utf-8"
     )
 
-    assert 'AI_LAB_HF_SECRET_NAME:-HF_TOKEN' in script
+    assert 'AI_LAB_HF_SECRET_NAME:-huggingface_token' in script
     assert '"HF_TOKEN":"{{ RUNPOD_SECRET_%s }}"' in script
 
 
