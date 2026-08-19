@@ -12,7 +12,7 @@ cleanup() {
   local code=$?
   local pid
   trap - EXIT INT TERM
-  for pid in "${COMFY_PID:-}" "${LAUNCHER_PID:-}" "${JUPYTER_PID:-}"; do
+  for pid in "${COMFY_PID:-}" "${GATEWAY_PID:-}" "${LAUNCHER_PID:-}" "${JUPYTER_PID:-}"; do
     if [[ "$pid" =~ ^[1-9][0-9]*$ ]]; then
       kill "$pid" 2>/dev/null || true
     fi
@@ -86,6 +86,14 @@ export MODELSCOPE_CACHE="${MODELSCOPE_CACHE:-$AI_LAB_ROOT/cache/modelscope}"
 export AI_LAB_MANIFEST_DIR="${AI_LAB_MANIFEST_DIR:-$TEMPLATE_ROOT/manifests}"
 export AI_LAB_WORKFLOW_DIR="${AI_LAB_WORKFLOW_DIR:-$TEMPLATE_ROOT/workflows/comfyui}"
 
+# Bind the public ComfyUI port immediately. RunPod can mark HTTP service 8188
+# ready while CUDA is still initializing; nginx switches transparently to the
+# real ComfyUI backend as soon as it starts listening on the internal port.
+log "Starting ComfyUI gateway on port 8188"
+nginx -g 'daemon off;' \
+  > >(tee -a "$AI_LAB_ROOT/logs/comfyui-gateway.log") 2>&1 &
+GATEWAY_PID=$!
+
 EXTRA_MODELS="$AI_LAB_ROOT/state/extra_model_paths.yaml"
 if [[ ! -f "$EXTRA_MODELS" ]]; then
   sed "s|__MODEL_ROOT__|$AI_LAB_ROOT/models/comfyui|g" \
@@ -106,11 +114,11 @@ LAUNCHER_PID=$!
 # hand the GPU to the container.
 (
   wait_for_cuda
-  log "Starting ComfyUI on port 8188"
+  log "Starting ComfyUI backend on port 8189"
   cd /opt/ComfyUI
   exec /usr/local/bin/python main.py \
     --listen 0.0.0.0 \
-    --port 8188 \
+    --port 8189 \
     --input-directory "$AI_LAB_ROOT/bridge/comfyui/input" \
     --output-directory "$AI_LAB_ROOT/bridge/comfyui/output" \
     --extra-model-paths-config "$EXTRA_MODELS"
@@ -128,7 +136,8 @@ jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root \
 JUPYTER_PID=$!
 
 wait_for_service "AI Lab Launcher" "http://127.0.0.1:3000/health" "$LAUNCHER_PID" true
-wait_for_service "ComfyUI" "http://127.0.0.1:8188/" "$COMFY_PID"
+wait_for_service "ComfyUI gateway" "http://127.0.0.1:8188/" "$GATEWAY_PID" true
+wait_for_service "ComfyUI backend" "http://127.0.0.1:8189/" "$COMFY_PID"
 wait_for_service "JupyterLab" "http://127.0.0.1:8888/" "$JUPYTER_PID"
 
 log "Startup checks finished; keeping the Pod alive while Launcher is running"
