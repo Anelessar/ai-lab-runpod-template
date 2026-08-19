@@ -21,6 +21,30 @@ def test_hugging_face_downloader_is_pinned_in_image() -> None:
     )
 
 
+def test_comfyui_manager_is_pinned_in_image() -> None:
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+
+    assert (
+        "COMFYUI_MANAGER_REF="
+        "f39cbd56fecae0b27a446c0cd450cd591f3a8bea"
+    ) in dockerfile
+    assert "Comfy-Org/ComfyUI-Manager.git" in dockerfile
+    assert "/opt/ComfyUI/custom_nodes/comfyui-manager" in dockerfile
+    assert (
+        "/opt/ComfyUI/custom_nodes/comfyui-manager/requirements.txt"
+        in dockerfile
+    )
+
+
+def test_runpod_template_maps_existing_hf_secret() -> None:
+    script = (ROOT / "scripts" / "create-runpod-template.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'AI_LAB_HF_SECRET_NAME:-HF_TOKEN' in script
+    assert '"HF_TOKEN":"{{ RUNPOD_SECRET_%s }}"' in script
+
+
 def test_dashboard_health_and_project_flow(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("AI_LAB_ROOT", str(tmp_path / "bootstrap-runtime"))
     from app.main import create_app

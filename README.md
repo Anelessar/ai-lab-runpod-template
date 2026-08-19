@@ -15,7 +15,7 @@ Launcher разрешает одновременно запускать толь
 
 При старте Pod ComfyUI сначала проверяет, что CUDA уже позволяет создать рабочий контекст. Если RunPod ещё не закончил подключать GPU, Launcher и Jupyter открываются сразу, а ComfyUI автоматически ждёт готовности видеокарты вместо аварийного завершения. Поэтому порт `8188` становится `Ready`, как только GPU действительно доступна.
 
-В образ также предустановлена нода [Hugging Face Download & Backup](https://github.com/jnxmx/ComfyUI_HuggingFace_Downloader). При открытии workflow она автоматически сканирует обычные ноды и вложенные subgraph, сверяет указанные модели с локальными файлами и открывает список отсутствующих моделей. После подтверждения загрузки файлы сохраняются через `extra_model_paths.yaml` в `/workspace/ai-lab/models/comfyui/<тип-модели>`, поэтому их сразу видит весь ComfyUI. Публичные модели скачиваются без авторизации; для gated-моделей нужно передать `HF_TOKEN` через RunPod Secret и заранее принять лицензию модели на Hugging Face.
+В образ также предустановлены [ComfyUI-Manager](https://github.com/Comfy-Org/ComfyUI-Manager) и нода [Hugging Face Download & Backup](https://github.com/jnxmx/ComfyUI_HuggingFace_Downloader). Manager позволяет устанавливать недостающие custom nodes прямо из ComfyUI. Downloader при открытии workflow автоматически сканирует обычные ноды и вложенные subgraph, сверяет указанные модели с локальными файлами и открывает список отсутствующих моделей. После подтверждения загрузки файлы сохраняются через `extra_model_paths.yaml` в `/workspace/ai-lab/models/comfyui/<тип-модели>`, поэтому их сразу видит весь ComfyUI. Публичные модели скачиваются без авторизации; для gated-моделей шаблон автоматически передаёт существующий RunPod Secret `HF_TOKEN` в контейнер. Лицензию модели нужно заранее принять на том же аккаунте Hugging Face.
 
 ## Структура внутри Pod
 
@@ -99,6 +99,10 @@ AI_LAB_RUNPOD_TEMPLATE_ID=YOUR_TEMPLATE_ID \
   AI_LAB_GPU_ID="NVIDIA B200" \
   ./scripts/start-pod.sh
 ```
+
+Скрипт ожидает, что в RunPod уже существует Secret с именем `HF_TOKEN`, и
+автоматически подключает его к одноимённой переменной контейнера. Если Secret
+назван иначе, передайте его имя через `AI_LAB_HF_SECRET_NAME`.
 
 Шаблон по умолчанию создаёт 500 GB **одноразового container disk** и `0 GB` persistent volume. Размер можно изменить через `AI_LAB_CONTAINER_GB`. Скрипт ставит автоматическую остановку через 12 часов (`AI_LAB_STOP_AFTER`), чтобы забытый Pod не продолжал расходовать деньги. Для обычных image/audio тестов можно выбрать более дешёвую GPU; JoyAI требует Blackwell, а SCoPE и крупнейшие video-модели требуют много VRAM.
 

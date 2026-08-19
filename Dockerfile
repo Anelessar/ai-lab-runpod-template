@@ -4,6 +4,7 @@ FROM ${RUNPOD_BASE}
 ARG COMFYUI_REF=b963f4ad210a42841ab23dfc28a84143a0cce227
 ARG COMFYUI_PIFLOW_REF=1e161f39ef4bf04c9033ed6a6cdc4d8373cc9e72
 ARG COMFYUI_HF_DOWNLOADER_REF=2bba5db6a52479e8ad465dbade19dd0da0784bd3
+ARG COMFYUI_MANAGER_REF=f39cbd56fecae0b27a446c0cd450cd591f3a8bea
 ENV DEBIAN_FRONTEND=noninteractive \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONUNBUFFERED=1 \
@@ -25,8 +26,11 @@ RUN git clone --filter=blob:none https://github.com/Comfy-Org/ComfyUI.git /opt/C
     && git clone --filter=blob:none https://github.com/jnxmx/ComfyUI_HuggingFace_Downloader.git /opt/ComfyUI/custom_nodes/ComfyUI_HuggingFace_Downloader \
     && git -C /opt/ComfyUI/custom_nodes/ComfyUI_HuggingFace_Downloader checkout ${COMFYUI_HF_DOWNLOADER_REF} \
     && rm -rf /opt/ComfyUI/custom_nodes/ComfyUI_HuggingFace_Downloader/node_modules \
+    && git clone --filter=blob:none https://github.com/Comfy-Org/ComfyUI-Manager.git /opt/ComfyUI/custom_nodes/comfyui-manager \
+    && git -C /opt/ComfyUI/custom_nodes/comfyui-manager checkout ${COMFYUI_MANAGER_REF} \
     && uv pip install --system -r /opt/ComfyUI/requirements.txt \
     && uv pip install --system -r /opt/ComfyUI/custom_nodes/ComfyUI_HuggingFace_Downloader/requirements.txt \
+    && uv pip install --system -r /opt/ComfyUI/custom_nodes/comfyui-manager/requirements.txt \
     && uv pip install --system "huggingface_hub[cli]" jupyterlab
 
 WORKDIR /opt/ai-lab-template
