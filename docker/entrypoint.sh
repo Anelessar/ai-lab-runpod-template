@@ -48,6 +48,26 @@ wait_for_service() {
   [[ "$required" != "true" ]]
 }
 
+wait_for_cuda() {
+  local attempt=0
+
+  # nvidia-smi may already see the card while the CUDA runtime still cannot
+  # create a context. ComfyUI exits permanently in that short window, leaving
+  # RunPod's port 8188 stuck on "Initializing". Test the same call ComfyUI uses
+  # and only start it after the allocated GPU is actually usable.
+  until /usr/local/bin/python -c \
+    'import torch; assert torch.cuda.is_available(); torch.cuda.mem_get_info()' \
+    >/dev/null 2>&1; do
+    attempt=$((attempt + 1))
+    if (( attempt == 1 || attempt % 10 == 0 )); then
+      log "Waiting for the CUDA device before starting ComfyUI (attempt $attempt)"
+    fi
+    sleep 3
+  done
+
+  log "CUDA device is ready for ComfyUI"
+}
+
 log "Preparing runtime at $AI_LAB_ROOT"
 
 mkdir -p \
@@ -81,15 +101,20 @@ cd "$TEMPLATE_ROOT/launcher"
   > >(tee -a "$AI_LAB_ROOT/logs/launcher.log") 2>&1 &
 LAUNCHER_PID=$!
 
-log "Starting ComfyUI on port 8188"
-cd /opt/ComfyUI
-/usr/local/bin/python main.py \
-  --listen 0.0.0.0 \
-  --port 8188 \
-  --input-directory "$AI_LAB_ROOT/bridge/comfyui/input" \
-  --output-directory "$AI_LAB_ROOT/bridge/comfyui/output" \
-  --extra-model-paths-config "$EXTRA_MODELS" \
-  > >(tee -a "$AI_LAB_ROOT/logs/comfyui.log") 2>&1 &
+# Keep the CUDA readiness check in ComfyUI's background process so Launcher
+# and Jupyter can become available immediately even when the host is slow to
+# hand the GPU to the container.
+(
+  wait_for_cuda
+  log "Starting ComfyUI on port 8188"
+  cd /opt/ComfyUI
+  exec /usr/local/bin/python main.py \
+    --listen 0.0.0.0 \
+    --port 8188 \
+    --input-directory "$AI_LAB_ROOT/bridge/comfyui/input" \
+    --output-directory "$AI_LAB_ROOT/bridge/comfyui/output" \
+    --extra-model-paths-config "$EXTRA_MODELS"
+) > >(tee -a "$AI_LAB_ROOT/logs/comfyui.log") 2>&1 &
 COMFY_PID=$!
 
 if [[ -z "${JUPYTER_TOKEN:-}" ]]; then
