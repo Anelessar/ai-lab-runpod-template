@@ -45,20 +45,15 @@ def test_runpod_template_maps_existing_hf_secret() -> None:
     assert '"HF_TOKEN":"{{ RUNPOD_SECRET_%s }}"' in script
 
 
-def test_comfyui_public_port_has_startup_gateway() -> None:
+def test_comfyui_listens_directly_on_public_port() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
     entrypoint = (ROOT / "docker" / "entrypoint.sh").read_text(encoding="utf-8")
-    gateway = (ROOT / "docker" / "comfyui-gateway.conf").read_text(
-        encoding="utf-8"
-    )
 
-    assert "nginx" in dockerfile
-    assert "nginx -t" in dockerfile
-    assert "Starting ComfyUI gateway on port 8188" in entrypoint
-    assert "--port 8189" in entrypoint
-    assert "proxy_pass http://127.0.0.1:8189" in gateway
-    assert "proxy_set_header Upgrade $http_upgrade" in gateway
-    assert "ComfyUI запускается" in gateway
+    assert "nginx" not in dockerfile
+    assert "Starting ComfyUI on public port 8188" in entrypoint
+    assert "--port 8188" in entrypoint
+    assert "127.0.0.1:8188" in entrypoint
+    assert "8189" not in entrypoint
 
 
 def test_dashboard_health_and_project_flow(tmp_path: Path, monkeypatch) -> None:

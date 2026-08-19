@@ -12,7 +12,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     AI_LAB_ROOT=/workspace/ai-lab
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      build-essential curl ffmpeg git git-lfs libgl1 libglib2.0-0 nginx ninja-build \
+      build-essential curl ffmpeg git git-lfs libgl1 libglib2.0-0 ninja-build \
       python3-dev python3-venv unzip wget \
     && rm -rf /var/lib/apt/lists/* \
     && git lfs install --system
@@ -40,11 +40,7 @@ COPY workflows /opt/ai-lab-template/workflows
 COPY adapters /opt/ai-lab-template/adapters
 COPY scripts /opt/ai-lab-template/scripts
 COPY docker /opt/ai-lab-template/docker
-COPY docker/comfyui-gateway.conf /etc/nginx/conf.d/comfyui-gateway.conf
-
-RUN rm -f /etc/nginx/sites-enabled/default \
-    && nginx -t \
-    && ln -sf /usr/local/bin/python /usr/local/bin/python3 \
+RUN ln -sf /usr/local/bin/python /usr/local/bin/python3 \
     && uv venv /opt/ai-lab-launcher-venv --python /usr/local/bin/python \
     && uv pip install --python /opt/ai-lab-launcher-venv/bin/python /opt/ai-lab-template/launcher \
     && chmod +x /opt/ai-lab-template/docker/entrypoint.sh /opt/ai-lab-template/scripts/*.sh
