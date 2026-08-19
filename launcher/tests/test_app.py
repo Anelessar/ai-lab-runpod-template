@@ -7,6 +7,20 @@ from app.config import Settings
 ROOT = Path(__file__).resolve().parents[2]
 
 
+def test_hugging_face_downloader_is_pinned_in_image() -> None:
+    dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
+
+    assert (
+        "COMFYUI_HF_DOWNLOADER_REF="
+        "2bba5db6a52479e8ad465dbade19dd0da0784bd3"
+    ) in dockerfile
+    assert "jnxmx/ComfyUI_HuggingFace_Downloader.git" in dockerfile
+    assert (
+        "/opt/ComfyUI/custom_nodes/ComfyUI_HuggingFace_Downloader/requirements.txt"
+        in dockerfile
+    )
+
+
 def test_dashboard_health_and_project_flow(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("AI_LAB_ROOT", str(tmp_path / "bootstrap-runtime"))
     from app.main import create_app
