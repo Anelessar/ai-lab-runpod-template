@@ -16,6 +16,29 @@ from .processes import ProcessManager
 from .projects import ProjectManager, human_size
 
 
+def apply_workflow_model_hints(path: Path, workflow) -> None:
+    if not workflow.model_hints:
+        return
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    changed = False
+    for hint in workflow.model_hints:
+        model = {
+            "name": hint.name,
+            "url": str(hint.url),
+            "directory": hint.directory,
+        }
+        for node in data.get("nodes", []):
+            if node.get("type") != hint.node_type:
+                continue
+            models = node.setdefault("properties", {}).setdefault("models", [])
+            if not any(item.get("name") == hint.name for item in models):
+                models.append(model)
+                changed = True
+    if changed:
+        path.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+
+
 class ToolManager:
     def __init__(
         self,
@@ -153,6 +176,7 @@ class ToolManager:
                     elif workflow.local_file:
                         source = (self.settings.template_root / workflow.local_file).resolve()
                         shutil.copy2(source, destination)
+                    apply_workflow_model_hints(destination, workflow)
 
         return self.jobs.submit("workflows", tool_id, task)
 

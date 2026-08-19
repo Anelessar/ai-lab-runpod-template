@@ -33,6 +33,12 @@ def test_asymflow_is_a_comfyui_adapter_with_a_baseline_workflow() -> None:
         "asymflow_flux2_klein_9b",
         "baseline_flux2_klein_9b_base",
     }
+    workflow = next(
+        item for item in asymflow.workflows if item.name == "asymflow_flux2_klein_9b"
+    )
+    assert len(workflow.model_hints) == 1
+    assert workflow.model_hints[0].name == "asymflux2_klein_9b.safetensors"
+    assert workflow.model_hints[0].directory == "loras"
 
 
 def test_ready_comfyui_tools_have_downloadable_workflows() -> None:

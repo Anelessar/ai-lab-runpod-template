@@ -84,7 +84,13 @@ tools:
     models: {mode: manual, instructions: "Общие с Klein: flux-2-klein-base-9b-fp8.safetensors → models/diffusion_models и qwen_3_8b_fp8mixed.safetensors → models/text_encoders. Только для AsymFlow: diffusion_pytorch_model.safetensors из Lakonik/AsymFLUX.2-klein-9B переименовать в asymflux2_klein_9b.safetensors и положить в models/loras. Для обычного Klein baseline дополнительно нужен full_encoder_small_decoder.safetensors в models/vae. BFL checkpoint gated: сначала принять FLUX license на Hugging Face."}
     launch: {mode: comfyui}
     workflows:
-      - {name: asymflow_flux2_klein_9b, url: https://raw.githubusercontent.com/Lakonik/ComfyUI-piFlow/main/workflows/asymflux2_klein_9b.json}
+      - name: asymflow_flux2_klein_9b
+        url: https://raw.githubusercontent.com/Lakonik/ComfyUI-piFlow/main/workflows/asymflux2_klein_9b.json
+        model_hints:
+          - node_type: "Load AsymFlow Model"
+            name: asymflux2_klein_9b.safetensors
+            url: https://huggingface.co/Lakonik/AsymFLUX.2-klein-9B/resolve/main/diffusion_pytorch_model.safetensors
+            directory: loras
       - {name: baseline_flux2_klein_9b_base, url: https://raw.githubusercontent.com/Comfy-Org/workflow_templates/main/templates/image_flux2_text_to_image_9b.json}
 
   - id: realgen-v2

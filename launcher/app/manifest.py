@@ -53,10 +53,18 @@ class RunAction(BaseModel):
     fields: list[RunField] = Field(default_factory=list)
 
 
+class WorkflowModelHint(BaseModel):
+    node_type: str
+    name: str
+    url: HttpUrl
+    directory: str
+
+
 class WorkflowSource(BaseModel):
     name: str
     url: HttpUrl | None = None
     local_file: str | None = None
+    model_hints: list[WorkflowModelHint] = Field(default_factory=list)
 
 
 class ToolManifest(BaseModel):
