@@ -45,7 +45,10 @@ RUN ln -sf /usr/local/bin/python /usr/local/bin/python3 \
     && uv pip install --python /opt/ai-lab-launcher-venv/bin/python /opt/ai-lab-template/launcher \
     && chmod +x /opt/ai-lab-template/docker/entrypoint.sh /opt/ai-lab-template/scripts/*.sh
 
-EXPOSE 3000 8188 8888 7860 8001 8080
+# Only ports with a process that always starts are published. 8001 and 8080
+# used to be declared for tools that are launched on demand, which left RunPod
+# showing two ports stuck on "Initializing" for the whole life of the Pod.
+EXPOSE 3000 7860 8188 8888
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=5 \
   CMD curl -fsS http://127.0.0.1:3000/health || exit 1
 

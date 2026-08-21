@@ -20,6 +20,28 @@
   {% if error %}<div class="notice error">{{ error }}</div>{% endif %}
 
   <main>
+    <section class="services card">
+      <h2>Порты Pod</h2>
+      <p class="muted">Это все порты, которые RunPod публикует. У каждого есть служба, стартующая при загрузке, поэтому «Initializing» без причины здесь быть не должно.</p>
+      <div class="service-grid">
+        {% for service in services %}
+          <div class="service {{ service.status }}">
+            <div class="service-head">
+              <strong>{{ service.name }}</strong>
+              <span class="chip {% if service.status == 'ready' %}ok{% elif service.status == 'failed' %}bad{% endif %}">
+                :{{ service.port }} · {{ service.status }}
+              </span>
+            </div>
+            {% if service.detail %}<p class="muted">{{ service.detail }}</p>{% endif %}
+            <div class="service-actions">
+              <a class="button" href="{{ service.url }}" target="_blank">Открыть</a>
+              {% if service.log_name %}<a class="button" href="/logs/{{ service.log_name }}" target="_blank">Лог</a>{% endif %}
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
     <section class="workspace card">
       <div>
         <h2>Активный проект</h2>
@@ -107,6 +129,7 @@
                 </div>
                 <p>{{ tool.description }}</p>
                 <div class="chips">
+                  <span class="chip verified-{{ tool.verified }}">{{ tool.verified_label }}</span>
                   {% if tool.kind == 'comfyui' %}
                     <span class="chip {% if status.installed %}ok{% endif %}">ComfyUI: {% if status.installed %}готов{% else %}не готов{% endif %}</span>
                   {% elif tool.kind == 'modifier' %}
@@ -117,18 +140,48 @@
                     <span class="chip {% if status.installed %}ok{% endif %}">Программа: {% if status.installed %}готова{% else %}нет{% endif %}</span>
                   {% endif %}
                   {% if tool.workflows %}<span class="chip {% if status.workflows %}ok{% endif %}">Workflow: {{ tool.workflows|length }} {% if status.workflows %}скачано{% else %}доступно{% endif %}</span>{% endif %}
-                  <span class="chip {% if status.models %}ok{% endif %}">Модели: {% if status.models %}есть{% else %}нет{% endif %}</span>
+                  {% if tool.models.mode not in ['disabled', 'manual'] %}
+                    <span class="chip {% if status.models %}ok{% endif %}">
+                      Модели: {% if status.models %}есть{% else %}не хватает {{ status.models_missing|join(', ') }}{% if status.models_size_gb %} (~{{ status.models_size_gb }} GB){% endif %}{% endif %}
+                    </span>
+                  {% endif %}
                   <span class="chip">{{ status.disk }} + {{ status.model_disk }}</span>
-                  {% if status.running %}<span class="chip live">Запущен</span>{% endif %}
+                  {% if status.process_status %}<span class="chip {% if status.ready %}live{% elif status.process_status == 'failed' %}bad{% endif %}">Процесс: {{ status.process_status }}</span>{% endif %}
                 </div>
+                {% if status.process_error %}
+                  <p class="notice error inline">{{ status.process_error }}
+                    <a href="/tools/{{ tool.id }}/log" target="_blank">полный лог</a></p>
+                {% endif %}
+                {% if tool.verified == 'unavailable' %}
+                  <p class="notice error inline">{{ tool.unavailable_reason }}</p>
+                {% endif %}
+                {% if tool.entrypoint %}<p class="muted"><strong>Запуск:</strong> <code>{{ tool.entrypoint }}</code></p>{% endif %}
                 <p class="pipeline"><strong>Pipeline:</strong> {{ tool.pipeline }}</p>
                 {% if tool.requirements %}<p class="muted"><strong>Нужно:</strong> {{ tool.requirements|join(' · ') }}</p>{% endif %}
                 <div class="actions">
-                  {% if tool.install.mode not in ['disabled', 'manual'] and not status.installed %}
-                    <form action="/tools/{{ tool.id }}/install" method="post"><button>Установить программу</button></form>
+                  {% set action = status.next_action %}
+                  {% if action.kind == 'install' %}
+                    <form action="/tools/{{ tool.id }}/install" method="post"><button class="primary">{{ action.label }}</button></form>
+                  {% elif action.kind == 'models' %}
+                    <form action="/tools/{{ tool.id }}/models" method="post"><button class="primary">{{ action.label }}</button></form>
+                  {% elif action.kind == 'launch' %}
+                    <form action="/tools/{{ tool.id }}/launch" method="post"><button class="primary">{{ action.label }}</button></form>
+                  {% elif action.kind == 'open-ui' %}
+                    <a class="button primary" href="/tools/{{ tool.id }}/open" target="_blank">{{ action.label }}</a>
+                  {% elif action.kind == 'open' %}
+                    <a class="button primary" href="/tools/{{ tool.id }}/open" target="_blank">{{ action.label }}</a>
+                  {% elif action.kind in ['manual', 'blocked'] %}
+                    <span class="chip">{{ action.label }}</span>
+                  {% elif action.kind == 'wait' %}
+                    <span class="chip live">{{ action.label }}</span>
                   {% endif %}
-                  {% if tool.models.mode not in ['disabled', 'manual'] and not status.models %}
-                    <form action="/tools/{{ tool.id }}/models" method="post"><button>Скачать модели</button></form>
+                  {% if status.running %}
+                    <form action="/tools/{{ tool.id }}/stop" method="post"><button>Остановить</button></form>
+                  {% elif status.process_status in ['failed', 'stopped'] %}
+                    <form action="/tools/{{ tool.id }}/dismiss" method="post"><button>Скрыть статус</button></form>
+                  {% endif %}
+                  {% if status.slot_taken_by and status.slot_taken_by != tool.id and tool.launch.mode == 'process' %}
+                    <span class="chip">Порт занят: {{ status.slot_taken_by }}</span>
                   {% endif %}
                   {% if tool.workflows and not status.workflows %}
                     <form action="/tools/{{ tool.id }}/workflows" method="post"><button>Скачать workflow ({{ tool.workflows|length }})</button></form>
@@ -141,16 +194,10 @@
                       </div>
                     </details>
                   {% endif %}
-                  {% if tool.launch.mode in ['comfyui', 'web'] %}<a class="button" href="/tools/{{ tool.id }}/open" target="_blank">Открыть</a>{% endif %}
-                  {% if tool.launch.mode == 'process' and status.installed and not status.running %}
-                    <form action="/tools/{{ tool.id }}/launch" method="post"><button class="primary">Запустить</button></form>
-                  {% endif %}
-                  {% if status.running %}<form action="/tools/{{ tool.id }}/stop" method="post"><button>Остановить</button></form>{% endif %}
-                  {% if status.running and tool.launch.port %}<a class="button primary" href="/tools/{{ tool.id }}/open" target="_blank">Открыть UI</a>{% endif %}
                 </div>
                 {% if tool.run.mode == 'command' and status.installed %}
                   <details class="run-form">
-                    <summary>Запустить обработку файла</summary>
+                    <summary>Запустить тест ({{ tool.adapter }} → runs/{{ tool.id }}/)</summary>
                     <form action="/tools/{{ tool.id }}/run" method="post">
                       {% for field in tool.run.fields %}
                         <label>{{ field.label }}
@@ -161,9 +208,14 @@
                             </select>
                           {% elif field.type == 'textarea' %}
                             <textarea name="{{ field.name }}" {% if field.required %}required{% endif %}>{{ field.default }}</textarea>
+                          {% elif field.type == 'select' %}
+                            <select name="{{ field.name }}" {% if field.required %}required{% endif %}>
+                              {% for choice in field.choices %}<option value="{{ choice }}" {% if choice == field.default %}selected{% endif %}>{{ choice }}</option>{% endfor %}
+                            </select>
                           {% else %}
                             <input type="{{ field.type }}" name="{{ field.name }}" value="{{ field.default }}" {% if field.required %}required{% endif %}>
                           {% endif %}
+                          {% if field.help %}<small class="muted">{{ field.help }}</small>{% endif %}
                         </label>
                       {% endfor %}
                       <button class="primary" type="submit">Запустить задачу</button>
@@ -174,7 +226,8 @@
                   <summary>Установка, модели и лицензия</summary>
                   <p><strong>Программа:</strong> {{ tool.install.instructions or 'Встроено в общий runtime.' }}</p>
                   <p><strong>Модели:</strong> {{ tool.models.instructions or 'Отдельные модели не требуются.' }}</p>
-                  <p><strong>Лицензия:</strong> {{ tool.license_note }}</p>
+                  <p><strong>Лицензия:</strong> {% if tool.license_spdx %}{{ tool.license_spdx }} — {% endif %}{{ tool.license_note }}</p>
+                  {% if tool.ref and tool.ref != 'main' %}<p class="muted"><strong>Commit:</strong> <code>{{ tool.ref }}</code></p>{% endif %}
                   {% if status.installed or status.models %}
                     <div class="danger-actions">
                       {% if status.models %}<form action="/tools/{{ tool.id }}/delete-models" method="post"><button>Удалить модели</button></form>{% endif %}
@@ -182,7 +235,13 @@
                     </div>
                   {% endif %}
                 </details>
-                {% if status.latest_job %}<p class="job">Последняя задача: {{ status.latest_job.kind }} — {{ status.latest_job.status }} · <a href="/jobs/{{ status.latest_job.id }}" target="_blank">лог</a></p>{% endif %}
+                {% if status.latest_job %}
+                  <p class="job">Последняя задача: {{ status.latest_job.kind }} — {{ status.latest_job.status }} ·
+                    <a href="/jobs/{{ status.latest_job.id }}" target="_blank">лог</a>
+                    {% if status.latest_job.artifacts %}· результат: {{ status.latest_job.artifacts|join(', ') }}{% endif %}
+                  </p>
+                  {% if status.latest_job.error %}<p class="notice error inline">{{ status.latest_job.error }}</p>{% endif %}
+                {% endif %}
               </article>
             {% endfor %}
           </div>

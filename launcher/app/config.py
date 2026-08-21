@@ -12,8 +12,9 @@ class Settings:
     manifest_dir: Path
     workflow_dir: Path
     launcher_port: int = 3000
-    comfyui_url: str = "http://localhost:8188"
-    jupyter_url: str = "http://localhost:8888"
+    comfyui_port: int = 8188
+    jupyter_port: int = 8888
+    tool_port: int = 7860
 
     @classmethod
     def from_env(cls) -> Settings:
@@ -30,8 +31,9 @@ class Settings:
                 os.getenv("AI_LAB_WORKFLOW_DIR", template_root / "workflows" / "comfyui")
             ).resolve(),
             launcher_port=int(os.getenv("AI_LAB_LAUNCHER_PORT", "3000")),
-            comfyui_url=os.getenv("AI_LAB_COMFYUI_URL", "http://localhost:8188"),
-            jupyter_url=os.getenv("AI_LAB_JUPYTER_URL", "http://localhost:8888"),
+            comfyui_port=int(os.getenv("AI_LAB_COMFYUI_PORT", "8188")),
+            jupyter_port=int(os.getenv("AI_LAB_JUPYTER_PORT", "8888")),
+            tool_port=int(os.getenv("AI_LAB_TOOL_PORT", "7860")),
         )
 
     @property
@@ -62,6 +64,14 @@ class Settings:
     def bridge_dir(self) -> Path:
         return self.runtime_root / "bridge" / "comfyui"
 
+    @property
+    def cache_dir(self) -> Path:
+        return self.runtime_root / "cache"
+
+    @property
+    def comfyui_url(self) -> str:
+        return self.public_port_url(self.comfyui_port)
+
     def ensure_runtime(self) -> None:
         for path in (
             self.runtime_root,
@@ -72,10 +82,18 @@ class Settings:
             self.logs_dir,
             self.state_dir,
             self.bridge_dir,
+            self.state_dir / "jobs",
+            self.cache_dir / "huggingface",
         ):
             path.mkdir(parents=True, exist_ok=True)
 
     def public_port_url(self, port: int) -> str:
+        """URL a browser outside the Pod can reach.
+
+        RunPod publishes every declared HTTP port as
+        https://<pod-id>-<port>.proxy.runpod.net. Outside RunPod the same
+        service is reachable on localhost, which keeps local testing honest.
+        """
         pod_id = os.getenv("RUNPOD_POD_ID", "").strip()
         if pod_id:
             return f"https://{pod_id}-{port}.proxy.runpod.net"

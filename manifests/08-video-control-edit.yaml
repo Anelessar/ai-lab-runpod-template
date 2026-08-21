@@ -8,6 +8,7 @@ tools:
     repo_url: https://github.com/Wan-Video/Wan-Animate-2
     priority: must
     adapter_status: ready
+    verified: catalogued
     requirements: ["несколько мощных GPU для Base", "NVIDIA GPU"]
     inputs: [image, video, text]
     outputs: [video]
@@ -25,14 +26,21 @@ tools:
     description: Talking-avatar модель для речи, действий и grounded-взаимодействия персонажа с объектами сцены.
     source_url: https://github.com/angzong/InteractAvatar
     repo_url: https://github.com/angzong/InteractAvatar
+    ref: 5ca013e571891e7d00dea3cebd739f98d7942f26
     priority: must
-    adapter_status: catalogued
-    requirements: ["Wan2.2-TI2V-5B", "мощная NVIDIA GPU"]
+    adapter_status: manual
+    verified: catalogued
+    license_spdx: Apache-2.0
+    license_note: Код Apache-2.0; базовая Wan2.2-TI2V-5B под собственной лицензией Wan.
+    entrypoint: "bash test_inter_tia2mv_GPu_hoi.sh (обёртка над test_wanx_tia2mv_obj_back.py)"
+    requirements: ["Wan2.2-TI2V-5B", "мощная NVIDIA GPU", "flash_attn 2.7.4.post1 из исходников", "librosa и ffmpeg из conda-forge"]
     inputs: [image, audio, text]
     outputs: [video]
     pipeline: "reference frame + action/audio → InteractAvatar → interaction MP4"
-    install: {mode: git-auto, instructions: "Официальный inference ставится в отдельное окружение."}
-    models: {mode: manual, instructions: "Скачать Wan base и InteractAvatar checkpoints по README."}
+    install:
+      mode: manual
+      instructions: "Официальная установка требует conda (librosa и ffmpeg ставятся из conda-forge) и сборки flash_attn 2.7.4.post1 без build isolation. Запуск идёт через шелл-скрипт с путями, зашитыми внутри, а не через CLI с аргументами, поэтому кнопки автозапуска нет."
+    models: {mode: manual, instructions: "Скачать Wan2.2-TI2V-5B base и InteractAvatar checkpoints, затем прописать пути в test_inter_tia2mv_GPu_hoi.sh."}
     launch: {mode: disabled}
 
   - id: cointeract
@@ -42,15 +50,39 @@ tools:
     description: Speech-driven взаимодействие человека с отдельным product reference, включая multi-clip и pose-driven режимы.
     source_url: https://github.com/luoxyhappy/CoInteract
     repo_url: https://github.com/luoxyhappy/CoInteract
+    ref: 8858e65e93d68f59c1bbb384720e4ff250b1b978
     priority: must
     adapter_status: catalogued
-    requirements: ["около 59 GB VRAM для 720p", "Wan2.2-S2V-14B"]
+    verified: installable
+    license_spdx: Apache-2.0
+    license_note: Код Apache-2.0; унаследованные ограничения Wan2.2-S2V проверить отдельно.
+    entrypoint: "python batch_infer.py --csv_path ... --output_dir ..."
+    vram_gb: 59
+    requirements: ["около 59 GB VRAM для 720p", "Wan2.2-S2V-14B", "chinese-wav2vec2-large"]
     inputs: [image, audio, text, pose]
     outputs: [video]
-    pipeline: "person/product references + audio + prompt/pose → CoInteract → MP4"
-    install: {mode: git-auto, instructions: "Официальный batch inference устанавливается отдельно."}
-    models: {mode: manual, instructions: "Скачать Wan base, CoInteract weights и optional pose LoRA."}
+    pipeline: "CSV с person/product references, audio и prompt → CoInteract batch_infer → MP4 в runs/"
+    install:
+      mode: git-auto
+      python_version: "3.10"
+      instructions: "Закреплённый commit и requirements.txt ставятся в отдельное uv-окружение. В репозитории лежит готовый examples/demos/demos.csv для первого прогона."
+    models:
+      mode: commands
+      size_gb: 60
+      commands:
+        - "mkdir -p '{model_dir}' && ln -sfn '{model_dir}' '{tool_dir}/models'"
+        - "hf download Wan-AI/Wan2.2-S2V-14B --local-dir '{model_dir}/Wan2.2-S2V-14B'"
+        - "hf download TencentGameMate/chinese-wav2vec2-large --local-dir '{model_dir}/chinese-wav2vec2-large'"
+      check: ["Wan2.2-S2V-14B", "chinese-wav2vec2-large"]
+      instructions: "batch_infer.py ищет веса в ./models внутри репозитория; AI Lab держит их в отдельной model-папке и подставляет её симлинком, чтобы удаление программы не стирало десятки гигабайт. LoRA-чекпоинт CoInteract скачивается отдельно по ссылке из readme.md и кладётся в models/CoInteract/checkpoint.safetensors."
     launch: {mode: disabled}
+    run:
+      mode: command
+      command: "'{env_dir}/bin/python' batch_infer.py --base_model_path '{model_dir}/Wan2.2-S2V-14B' --audio_encoder_path '{model_dir}/chinese-wav2vec2-large' --lora_path '{model_dir}/CoInteract/checkpoint.safetensors' --csv_path {csv_path} --output_dir '{output_dir}' --num_clips {num_clips}"
+      timeout_s: 21600
+      fields:
+        - {name: csv_path, label: CSV со сценами, type: file, help: "Формат как в examples/demos/demos.csv"}
+        - {name: num_clips, label: Число клипов, type: number, default: "3"}
 
   - id: scope
     name: SCoPE
@@ -61,12 +93,16 @@ tools:
     repo_url: https://github.com/TencentARC/SCoPE
     ref: 6658d0e286648b07aa9fd30932add53716deaee3
     priority: must
-    adapter_status: ready
-    license_note: Apache 2.0; проверить лицензии входных данных и унаследованные ограничения Wan2.2.
+    adapter_status: catalogued
+    verified: installable
+    license_spdx: NOASSERTION
+    license_note: LICENSE.txt в репозитории — собственная лицензия Tencent, а не чистый Apache 2.0. Проверить её и унаследованные ограничения Wan2.2 перед коммерческим использованием.
+    entrypoint: "python inference.py --model_path ... --input_image ... --prompt ... --camera_path ... --output_path ..."
+    download_gb: 67
     requirements: ["около 67 GB checkpoint", "Python 3.11", "PyTorch 2.9.1 / CUDA 12.8"]
     inputs: [image, text, camera_poses]
     outputs: [video]
-    pipeline: "first frame + prompt + camera_poses.npy + FOV → SCoPE → 81-frame MP4"
+    pipeline: "first frame + prompt + camera_poses.npy + FOV → SCoPE → 81-frame MP4 в runs/"
     install:
       mode: git-auto
       commands: ["uv sync"]
@@ -75,11 +111,14 @@ tools:
       mode: huggingface
       repo_ids: [TencentARC/SCoPE]
       size_gb: 67
+      check: ["TencentARC--SCoPE"]
       instructions: "Кнопка скачивает self-contained checkpoint; отдельный Wan2.2 не нужен."
     launch: {mode: disabled}
     run:
       mode: command
-      command: "uv run python inference.py --model_path '{model_dir}/TencentARC--SCoPE' --input_image {input_image} --prompt {prompt} --camera_path {camera_path} --x_fov {x_fov} --output_path {output_dir}/scope-{timestamp}.mp4"
+      command: "uv run python inference.py --model_path '{model_dir}/TencentARC--SCoPE' --input_image {input_image} --prompt {prompt} --camera_path {camera_path} --x_fov {x_fov} --output_path '{output_dir}/scope.mp4'"
+      timeout_s: 10800
+      smoke_command: "uv run python inference.py --help"
       fields:
         - {name: input_image, label: Первый кадр, type: file}
         - {name: prompt, label: Prompt, type: textarea}
@@ -95,29 +134,44 @@ tools:
     repo_url: https://github.com/jd-opensource/JoyAI-Video-Edit
     ref: 6134e39da9487d64a52c048d9bd1a370d3fb5c9b
     priority: must
-    adapter_status: ready
+    adapter_status: catalogued
+    verified: installable
+    license_spdx: Apache-2.0
     license_note: Deployment-код и основная модель Apache 2.0; отдельно проверить лицензии MiMo-VL и входных материалов.
+    entrypoint: "bash deploy/run_server.sh → uvicorn xvideo/serving/serve_joyomni_streaming.py, Web UI на GET /"
+    download_gb: 51
     requirements: ["B200 либо RTX PRO 6000 Blackwell", "CUDA Toolkit 12.8", "примерно 51 GB checkpoints"]
     inputs: [video, image, text]
     outputs: [video]
     pipeline: "MP4/live stream + instruction/reference → JoyAI WebSocket server → edited MP4"
     install:
       mode: git-auto
+      python_version: "3.10"
       commands: ["bash '{template_root}/scripts/install-joyai.sh' '{tool_dir}' '{env_dir}'"]
       instructions: "Tool-specific installer собирает CUDA 12.8 extensions под фактическую Blackwell GPU; первый запуск долгий."
     models:
       mode: commands
       size_gb: 51
+      requires_hf_token: false
       commands:
         - "hf download jdopensource/JoyAI-Video-Edit --local-dir '{model_dir}/JoyAI-Video-Edit' --include 'dit/joyai_video_edit_dit_0811.pth' 'vae/*'"
         - "hf download XiaomiMiMo/MiMo-VL-7B-RL-2508 --local-dir '{model_dir}/MiMo-VL-7B-RL-2508'"
-      instructions: "Скачиваются только актуальный DiT 0811, VAE и MiMo-VL; старый DiT 0804 пропускается."
+      files:
+        - url: https://media.githubusercontent.com/media/opencv/opencv_zoo/main/models/face_detection_yunet/face_detection_yunet_2023mar.onnx
+          path: face_detection_yunet_2023mar.onnx
+      check:
+        - "JoyAI-Video-Edit/dit/joyai_video_edit_dit_0811.pth"
+        - "JoyAI-Video-Edit/vae"
+        - "MiMo-VL-7B-RL-2508"
+        - "face_detection_yunet_2023mar.onnx"
+      instructions: "Скачиваются актуальный DiT 0811, VAE, MiMo-VL и YuNet-детектор; старый DiT 0804 пропускается. Второй ONNX-детектор yolov8n сервер считает опциональным: его нельзя взять готовым с Hub, он требует собственного экспорта ultralytics с imgsz=320 в отдельном окружении (DEPLOYMENT.md). Без него работает face-gate, но не person-gate."
     launch:
       mode: process
-      command: "JOYOMNI_FP8_IMG=0 JOYOMNI_FP8_TXT=0 JOYOMNI_SAGE_ATTN=0 JOYOMNI_DIT_CKPT='{model_dir}/JoyAI-Video-Edit/dit/joyai_video_edit_dit_0811.pth' JOYOMNI_VAE_CKPT='{model_dir}/JoyAI-Video-Edit/vae' JOYOMNI_TEXT_ENCODER_CKPT='{model_dir}/MiMo-VL-7B-RL-2508' JOYOMNI_RECORD_DIR='{project_dir}/runs/joyai-video-edit' JOYOMNI_HOST=0.0.0.0 JOYOMNI_PORT={port} bash deploy/run_server.sh"
-      port: 8080
-      path: /
-      health_path: /health
+      ui: fastapi
+      command: "JOYOMNI_FP8_IMG=0 JOYOMNI_FP8_TXT=0 JOYOMNI_SAGE_ATTN=0 JOYOMNI_DIT_CKPT='{model_dir}/JoyAI-Video-Edit/dit/joyai_video_edit_dit_0811.pth' JOYOMNI_VAE_CKPT='{model_dir}/JoyAI-Video-Edit/vae' JOYOMNI_TEXT_ENCODER_CKPT='{model_dir}/MiMo-VL-7B-RL-2508' JOYOMNI_FACE_ONNX='{model_dir}/face_detection_yunet_2023mar.onnx' JOYOMNI_PERSON_ONNX='{model_dir}/yolov8n.onnx' JOYOMNI_RECORD_DIR='{project_dir}/runs/joyai-video-edit' JOYOMNI_CACHE_ROOT='{runtime_root}/cache/joyai' JOYOMNI_HOST=127.0.0.1 JOYOMNI_PORT={port} bash deploy/run_server.sh"
+      # DEPLOYMENT.md documents the browser client at GET /, not a /health route.
+      health_path: /
+      startup_timeout_s: 1800
 
   - id: v-rgbx
     name: V-RGBX
@@ -126,16 +180,42 @@ tools:
     description: Разложение видео на albedo, normals, material и irradiance с физически осмысленным редактированием.
     source_url: https://github.com/Aleafy/V-RGBX
     repo_url: https://github.com/Aleafy/V-RGBX
+    ref: 4de559b89f3ea469fc4659fc0d4adf47d1b708d3
     priority: must
     adapter_status: catalogued
-    license_note: Только исследовательские/некоммерческие тесты без отдельного разрешения авторов.
-    requirements: ["Wan2.1-T2V-1.3B", "NVIDIA GPU"]
+    verified: installable
+    license_spdx: Apache-2.0
+    license_note: Репозиторий помечен Apache-2.0, но README ограничивает использование исследовательскими задачами и наследует лицензию Wan2.1. Для коммерческой работы нужно письменное разрешение авторов.
+    entrypoint: "python vrgbx_edit_inference.py --video_path ... --edit_type ... --edit_x_path ..."
+    requirements: ["Wan2.1-T2V-1.3B", "NVIDIA GPU", "Python 3.10"]
     inputs: [video, image, text]
     outputs: [video, maps]
-    pipeline: "video + edit/reference/maps → V-RGBX inverse/forward render → MP4"
-    install: {mode: git-auto, instructions: "Официальный Python framework ставится в отдельное окружение."}
-    models: {mode: manual, instructions: "Скачать Wan2.1 base и V-RGBX checkpoints."}
+    pipeline: "video + edited intrinsic frame → V-RGBX inverse/forward render → MP4 в runs/"
+    install:
+      mode: git-auto
+      python_version: "3.10"
+      instructions: "Закреплённый commit и pyproject ставятся через uv в отдельное окружение."
+    models:
+      mode: commands
+      commands:
+        - "mkdir -p '{model_dir}' && ln -sfn '{model_dir}' '{tool_dir}/models'"
+        - "'{env_dir}/bin/python' vrgbx/utils/download_weights.py --repo_id aleafy/V-RGBX --local_dir '{model_dir}/V-RGBX'"
+        - "'{env_dir}/bin/python' vrgbx/utils/download_weights.py --repo_id Wan-AI/Wan2.1-T2V-1.3B --local_dir '{model_dir}/Wan-AI/Wan2.1-T2V-1.3B'"
+      check:
+        - "V-RGBX/vrgbx_inverse_renderer.safetensors"
+        - "V-RGBX/vrgbx_forward_renderer.safetensors"
+        - "Wan-AI/Wan2.1-T2V-1.3B"
+      instructions: "Скачивание идёт официальным скриптом репозитория. Веса живут в отдельной model-папке, а ./models внутри репозитория — симлинк на неё, потому что код обращается к весам относительными путями."
     launch: {mode: disabled}
+    run:
+      mode: command
+      command: "'{env_dir}/bin/python' vrgbx_edit_inference.py --video_path {video_path} --edit_type {edit_type} --edit_x_path {edit_x_path} --num_frames {num_frames} --output_dir '{output_dir}'"
+      timeout_s: 10800
+      fields:
+        - {name: video_path, label: Исходное видео, type: file}
+        - {name: edit_type, label: Какой intrinsic редактируем, type: select, choices: [albedo, normal, material, irradiance], default: albedo}
+        - {name: edit_x_path, label: Отредактированный кадр intrinsic, type: file}
+        - {name: num_frames, label: Число кадров, type: number, default: "49"}
 
   - id: reco
     name: ReCo / ReCo_Ref
@@ -144,15 +224,41 @@ tools:
     description: Instruction/reference video editing adapters для removal, replacement, addition и style propagation.
     source_url: https://github.com/HiDream-ai/ReCo
     repo_url: https://github.com/HiDream-ai/ReCo
+    ref: a5838412dff302795b48b9a09b508d23c64cd2cb
     priority: must
     adapter_status: catalogued
-    requirements: ["Wan2.1-VACE-1.3B", "NVIDIA GPU"]
+    verified: installable
+    license_spdx: Apache-2.0
+    license_note: Код Apache-2.0; базовая Wan2.1-VACE наследует собственную лицензию.
+    entrypoint: "python scripts/inference_reco_single.py --task_name ... --test_txt_file_name ... --base_video_folder ..."
+    requirements: ["Wan2.1-VACE-1.3B", "NVIDIA GPU", "Python 3.11"]
     inputs: [video, mask, image, text]
     outputs: [video]
-    pipeline: "video + mask/instruction/reference → ReCo → edited MP4"
-    install: {mode: git-auto, instructions: "Официальные inference scripts устанавливаются отдельно."}
-    models: {mode: manual, instructions: "Скачать VACE base и ReCo/ReCo_Ref adapters."}
+    pipeline: "список видео в .txt + task_name → ReCo → edited MP4"
+    install:
+      mode: git-auto
+      python_version: "3.11"
+      instructions: "Закреплённый commit и requirements.txt ставятся в отдельное uv-окружение."
+    models:
+      mode: commands
+      commands:
+        - "mkdir -p '{model_dir}/Wan-AI' && ln -sfn '{model_dir}/Wan-AI' '{tool_dir}/Wan-AI'"
+        - "hf download Wan-AI/Wan2.1-VACE-1.3B --local-dir '{model_dir}/Wan-AI/Wan2.1-VACE-1.3B'"
+      check: ["Wan-AI/Wan2.1-VACE-1.3B"]
+      instructions: "Базовый VACE скачивается автоматически. Сами ReCo/ReCo_Ref adapters (all_ckpts/*.ckpt) публикуются отдельными релизами — ссылку взять из README и положить файл рядом; путь указывается в форме запуска."
     launch: {mode: disabled}
+    run:
+      mode: command
+      # inference_reco_single.py hardcodes its output to ./all_results/single_test
+      # and exposes no flag for it, so point that path at this run's folder
+      # before starting; results land in runs/reco/<stamp>/single_test/<task>/.
+      command: "rm -rf all_results && ln -sfn '{output_dir}' all_results && '{env_dir}/bin/python' scripts/inference_reco_single.py --task_name {task_name} --test_txt_file_name {test_txt_file_name} --base_video_folder {base_video_folder} --base_wan_folder '{model_dir}/Wan-AI' --lora_ckpt {lora_ckpt}"
+      timeout_s: 10800
+      fields:
+        - {name: task_name, label: Задача, type: select, choices: [remove, replace, add, style], default: remove}
+        - {name: test_txt_file_name, label: Список видео (.txt), type: file}
+        - {name: base_video_folder, label: Папка с видео, type: text, default: assets/test_videos}
+        - {name: lora_ckpt, label: ReCo adapter (.ckpt), type: text}
 
   - id: matanyone2
     name: MatAnyone2
@@ -161,13 +267,32 @@ tools:
     description: Temporal human video matting с устойчивой alpha-mask и сохранением тонких деталей.
     source_url: https://github.com/pq-yang/MatAnyone2
     repo_url: https://github.com/pq-yang/MatAnyone2
+    ref: 0079197acd6d16a741f71558809c06c586c579e0
     priority: must
     adapter_status: catalogued
-    license_note: Только некоммерческое использование без отдельного разрешения.
-    requirements: ["NVIDIA GPU"]
+    verified: installable
+    license_spdx: NOASSERTION
+    license_note: LICENSE.txt разрешает только некоммерческое использование без отдельного разрешения авторов.
+    entrypoint: "python inference_matanyone2.py -i <video|frames> -m <first-frame mask> -o <output dir>"
+    requirements: ["NVIDIA GPU", "маска первого кадра", "Python 3.10+"]
     inputs: [video, mask]
     outputs: [video, alpha]
-    pipeline: "video + first-frame mask → foreground + alpha → ComfyUI composite"
-    install: {mode: git-auto, instructions: "Официальный CLI/Python/Gradio ставится в отдельное окружение."}
-    models: {mode: manual, instructions: "Скачать MatAnyone2 checkpoint по README."}
+    pipeline: "video + first-frame mask → foreground + alpha в runs/ → ComfyUI composite"
+    install:
+      mode: git-auto
+      python_version: "3.10"
+      commands: ["uv sync"]
+      instructions: "pyproject уже указывает индекс PyTorch cu128 и no-build-isolation для thinplate, поэтому uv sync достаточно."
+    models:
+      mode: disabled
+      instructions: "Отдельная кнопка не нужна: inference_matanyone2.py сам скачивает matanyone2.pth в pretrained_models при первом запуске."
     launch: {mode: disabled}
+    run:
+      mode: command
+      command: "uv run python inference_matanyone2.py -i {input_path} -m {mask_path} -o '{output_dir}' --suffix {suffix}"
+      timeout_s: 7200
+      smoke_command: "uv run python inference_matanyone2.py --help"
+      fields:
+        - {name: input_path, label: Видео или папка кадров, type: file}
+        - {name: mask_path, label: Маска первого кадра (PNG), type: file}
+        - {name: suffix, label: Суффикс результата, type: text, required: false, default: target1}

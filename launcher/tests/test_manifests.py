@@ -1,13 +1,14 @@
+import re
 from pathlib import Path
 
-from app.manifest import ManifestRegistry
+from app.manifest import COMMIT_SHA, RUNNABLE, ManifestRegistry
 
 ROOT = Path(__file__).resolve().parents[2]
+REGISTRY = ManifestRegistry(ROOT / "manifests").load()
 
 
 def test_all_manifests_are_valid_and_unique() -> None:
-    registry = ManifestRegistry(ROOT / "manifests").load()
-    tools = registry.all()
+    tools = REGISTRY.all()
 
     assert len(tools) >= 35
     assert len({tool.id for tool in tools}) == len(tools)
@@ -17,15 +18,13 @@ def test_all_manifests_are_valid_and_unique() -> None:
 
 
 def test_categories_are_sorted_by_their_number() -> None:
-    registry = ManifestRegistry(ROOT / "manifests").load()
-    numbers = [int(category.split("·", 1)[0].strip()) for category in registry.categories()]
+    numbers = [int(category.split("·", 1)[0].strip()) for category in REGISTRY.categories()]
 
     assert numbers == sorted(numbers)
 
 
 def test_asymflow_is_a_comfyui_adapter_with_a_baseline_workflow() -> None:
-    registry = ManifestRegistry(ROOT / "manifests").load()
-    asymflow = registry.get("asymflow")
+    asymflow = REGISTRY.get("asymflow")
 
     assert asymflow.kind == "comfyui"
     assert asymflow.install.mode == "disabled"
@@ -42,9 +41,8 @@ def test_asymflow_is_a_comfyui_adapter_with_a_baseline_workflow() -> None:
 
 
 def test_ready_comfyui_tools_have_downloadable_workflows() -> None:
-    registry = ManifestRegistry(ROOT / "manifests").load()
     ready_comfy = [
-        tool for tool in registry.all() if tool.kind == "comfyui" and tool.adapter_status == "ready"
+        tool for tool in REGISTRY.all() if tool.kind == "comfyui" and tool.adapter_status == "ready"
     ]
 
     assert ready_comfy
@@ -53,7 +51,6 @@ def test_ready_comfyui_tools_have_downloadable_workflows() -> None:
 
 
 def test_tools_with_official_comfyui_workflows_are_connected_to_the_launcher() -> None:
-    registry = ManifestRegistry(ROOT / "manifests").load()
     official_workflow_tools = {
         "asymflow",
         "ernie-image",
@@ -74,12 +71,98 @@ def test_tools_with_official_comfyui_workflows_are_connected_to_the_launcher() -
         "z-image",
     }
 
-    assert all(registry.get(tool_id).workflows for tool_id in official_workflow_tools)
+    assert all(REGISTRY.get(tool_id).workflows for tool_id in official_workflow_tools)
     assert all(
-        registry.get(tool_id).launch.mode == "comfyui" for tool_id in official_workflow_tools
+        REGISTRY.get(tool_id).launch.mode == "comfyui" for tool_id in official_workflow_tools
     )
 
 
 def test_every_free_tool_has_a_concrete_pipeline() -> None:
-    registry = ManifestRegistry(ROOT / "manifests").load()
-    assert all(tool.pipeline.strip() for tool in registry.all() if tool.access == "free")
+    assert all(tool.pipeline.strip() for tool in REGISTRY.all() if tool.access == "free")
+
+
+# --------------------------------------------------------------- honesty rules
+
+
+def test_no_standalone_tool_claims_ready_without_a_verified_launch() -> None:
+    liars = [
+        tool.id
+        for tool in REGISTRY.standalone()
+        if tool.adapter_status == "ready" and tool.verified not in RUNNABLE
+    ]
+    assert not liars, f"ready without a verified launch: {liars}"
+
+
+def test_automated_standalone_tools_pin_an_exact_commit() -> None:
+    unpinned = [
+        tool.id
+        for tool in REGISTRY.standalone()
+        if tool.install.mode == "git-auto" and not COMMIT_SHA.fullmatch(tool.ref)
+    ]
+    assert not unpinned, f"git-auto without a pinned sha: {unpinned}"
+
+
+def test_every_automated_standalone_tool_records_its_real_entrypoint() -> None:
+    missing = [
+        tool.id
+        for tool in REGISTRY.standalone()
+        if tool.is_automatable and not tool.entrypoint.strip()
+    ]
+    assert not missing, f"no entrypoint recorded: {missing}"
+
+
+def test_unavailable_tools_explain_themselves() -> None:
+    for tool in REGISTRY.all():
+        if tool.verified == "unavailable":
+            assert tool.unavailable_reason.strip(), f"{tool.id} is unavailable with no reason"
+            assert tool.launch.mode == "disabled"
+            assert tool.run.mode == "disabled"
+
+
+def test_no_tool_asks_for_a_public_port_of_its_own() -> None:
+    # Tool UIs are published through the shared tool port; a per-tool public
+    # port is what produced the permanent "Initializing" entries in RunPod.
+    claimed = [tool.id for tool in REGISTRY.all() if tool.launch.port is not None]
+    assert not claimed, f"tools requesting their own port: {claimed}"
+
+
+def test_manual_tools_say_why_they_are_manual() -> None:
+    for tool in REGISTRY.standalone():
+        if tool.install.mode in {"disabled", "manual"}:
+            assert tool.install.instructions.strip(), f"{tool.id} has no explanation"
+
+
+def test_one_shot_tools_write_into_the_project_run_folder() -> None:
+    for tool in REGISTRY.all():
+        if tool.run.mode != "command":
+            continue
+        assert "{output_dir}" in tool.run.command, f"{tool.id} does not write into runs/"
+
+
+def test_manifest_commands_only_reference_adapters_that_exist() -> None:
+    # A manifest pointing at a deleted or renamed helper script fails at run
+    # time, in a job log, minutes after the user pressed the button.
+    referenced = set()
+    pattern = re.compile(r"\{template_root\}/(adapters/[\w./-]+)")
+    for tool in REGISTRY.all():
+        for command in [tool.run.command, tool.launch.command, *tool.install.commands, *tool.models.commands]:
+            referenced.update(pattern.findall(command))
+    assert referenced, "expected at least one adapter reference"
+    for relative in sorted(referenced):
+        assert (ROOT / relative).is_file(), f"manifest references a missing file: {relative}"
+
+
+def test_manifest_scripts_only_reference_scripts_that_exist() -> None:
+    pattern = re.compile(r"\{template_root\}/(scripts/[\w./-]+)")
+    for tool in REGISTRY.all():
+        for command in [*tool.install.commands, *tool.models.commands]:
+            for relative in pattern.findall(command):
+                assert (ROOT / relative).is_file(), f"manifest references a missing script: {relative}"
+
+
+def test_huggingface_downloads_declare_what_must_exist_afterwards() -> None:
+    for tool in REGISTRY.all():
+        if tool.models.mode in {"disabled", "manual"}:
+            continue
+        expected = tool.models.check or [item.path for item in tool.models.files] or tool.models.repo_ids
+        assert expected, f"{tool.id} downloads models but never says what should appear"

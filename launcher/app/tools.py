@@ -9,11 +9,21 @@ import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
 
+from .adapters import (
+    InstallPlanner,
+    ModelFetcher,
+    ToolContext,
+    job_adapter,
+    launch_adapter,
+)
 from .config import Settings
 from .jobs import Job, JobManager, run_commands
 from .manifest import ManifestRegistry, ToolManifest
-from .processes import ProcessManager
+from .processes import STATUS_FAILED, STATUS_READY, STATUS_STOPPED, ProcessManager
 from .projects import ProjectManager, human_size
+from .services import last_error_line, tail
+
+INSTALL_MARKER = ".ai-lab-installed.json"
 
 
 def apply_workflow_model_hints(path: Path, workflow) -> None:
@@ -53,6 +63,10 @@ class ToolManager:
         self.jobs = jobs
         self.processes = processes
         self.projects = projects
+        self.installer = InstallPlanner()
+        self.models = ModelFetcher()
+
+    # ---------------------------------------------------------------- context
 
     def paths(self, tool_id: str) -> dict[str, Path]:
         self.registry.get(tool_id)
@@ -63,100 +77,207 @@ class ToolManager:
             "workflow": self.settings.workflow_dir / tool_id,
         }
 
+    def context(
+        self,
+        tool: ToolManifest,
+        *,
+        port: int | None = None,
+        output_dir: Path | None = None,
+        values: dict[str, str] | None = None,
+    ) -> ToolContext:
+        paths = self.paths(tool.id)
+        return ToolContext(
+            tool=tool,
+            tool_dir=paths["tool"],
+            env_dir=paths["env"],
+            model_dir=paths["model"],
+            workflow_dir=paths["workflow"],
+            project_dir=self.projects.path(self.projects.active()),
+            template_root=self.settings.template_root,
+            runtime_root=self.settings.runtime_root,
+            port=port,
+            output_dir=output_dir,
+            values=values or {},
+        )
+
+    def is_installed(self, tool: ToolManifest) -> bool:
+        if tool.kind in {"comfyui", "modifier", "web"}:
+            return True
+        return (self.paths(tool.id)["tool"] / INSTALL_MARKER).exists()
+
+    # ----------------------------------------------------------------- status
+
     def status(self, tool: ToolManifest) -> dict[str, object]:
         paths = self.paths(tool.id)
+        context = self.context(tool)
         running = self.processes.current()
+        mine = bool(running and running["tool_id"] == tool.id)
+        installed = self.is_installed(tool)
+        models_present = self.models.present(context)
+        active_job = self.jobs.active_for(tool.id)
         latest = self.jobs.latest_for(tool.id)
+
+        process_status = str(running["status"]) if mine else ""
         return {
-            "installed": (paths["tool"] / ".ai-lab-installed.json").exists()
-            or tool.kind in {"comfyui", "modifier", "web"},
-            "models": paths["model"].exists() and any(paths["model"].rglob("*")),
+            "installed": installed,
+            "models": models_present,
+            "models_missing": self.models.missing(context),
+            "models_size_gb": tool.models.size_gb or tool.download_gb,
             "workflows": paths["workflow"].exists() and any(paths["workflow"].glob("*.json")),
-            "running": bool(running and running["tool_id"] == tool.id),
+            "running": mine and process_status not in {STATUS_FAILED, STATUS_STOPPED},
+            "ready": mine and process_status == STATUS_READY,
+            "process_status": process_status,
+            "process_error": str(running["error"]) if mine else "",
             "running_process": running,
+            "slot_taken_by": self.processes.occupied_by(),
+            "active_job": active_job,
             "latest_job": latest,
-            "disk": human_size(sum(path.stat().st_size for path in paths["tool"].rglob("*") if path.is_file()))
-            if paths["tool"].exists()
-            else "0 B",
-            "model_disk": human_size(sum(path.stat().st_size for path in paths["model"].rglob("*") if path.is_file()))
-            if paths["model"].exists()
-            else "0 B",
+            "adapter": tool.adapter_type,
+            "disk": self._disk(paths["tool"]),
+            "model_disk": self._disk(paths["model"]),
+            "next_action": self.next_action(tool, installed, models_present, mine, process_status, active_job),
         }
+
+    def _disk(self, path: Path) -> str:
+        if not path.exists():
+            return "0 B"
+        return human_size(sum(item.stat().st_size for item in path.rglob("*") if item.is_file()))
+
+    def next_action(
+        self,
+        tool: ToolManifest,
+        installed: bool,
+        models_present: bool,
+        mine: bool,
+        process_status: str,
+        active_job: dict[str, object] | None,
+    ) -> dict[str, str]:
+        """The single button the dashboard should offer, and nothing else."""
+        if tool.verified == "unavailable":
+            return {"kind": "blocked", "label": "Недоступно", "reason": tool.unavailable_reason}
+        if active_job:
+            return {"kind": "wait", "label": f"Идёт {active_job['kind']}", "reason": ""}
+        if tool.adapter_type in {"comfyui", "web"}:
+            return {"kind": "open", "label": "Открыть", "reason": ""}
+        if not tool.is_automatable:
+            return {
+                "kind": "manual",
+                "label": "Только ручной запуск",
+                "reason": tool.install.instructions or "Автоматическая установка не проверена.",
+            }
+        if not installed:
+            return {"kind": "install", "label": "Установить программу", "reason": ""}
+        if tool.models.mode not in {"disabled", "manual"} and not models_present:
+            size = tool.models.size_gb or tool.download_gb
+            suffix = f" (~{size:g} GB)" if size else ""
+            return {"kind": "models", "label": f"Скачать модели{suffix}", "reason": ""}
+        if mine and process_status == STATUS_READY:
+            return {"kind": "open-ui", "label": "Открыть UI", "reason": ""}
+        if mine and process_status:
+            return {"kind": "wait", "label": "Запускается…", "reason": ""}
+        if tool.has_ui:
+            return {"kind": "launch", "label": "Запустить", "reason": ""}
+        if tool.has_job:
+            return {"kind": "run", "label": "Запустить тест", "reason": ""}
+        return {"kind": "none", "label": "", "reason": ""}
+
+    # ---------------------------------------------------------------- install
 
     def install(self, tool_id: str) -> Job:
         tool = self.registry.get(tool_id)
+        if tool.verified == "unavailable":
+            raise RuntimeError(tool.unavailable_reason)
         if tool.install.mode in {"disabled", "manual"}:
             raise RuntimeError(tool.install.instructions or "Автоматическая установка не настроена")
 
         def task(log_path: Path) -> None:
-            paths = self.paths(tool_id)
-            tool_dir = paths["tool"]
-            env_dir = paths["env"]
-            if (tool_dir / ".ai-lab-installed.json").exists():
-                with log_path.open("a", encoding="utf-8") as stream:
-                    stream.write("Program is already installed.\n")
+            context = self.context(tool)
+            tool_dir = context.tool_dir
+            if (tool_dir / INSTALL_MARKER).exists():
+                self._append(log_path, "Программа уже установлена.\n")
                 return
             if tool.install.mode == "git-auto":
-                if tool_dir.exists() and any(tool_dir.iterdir()):
-                    raise RuntimeError(f"{tool_dir} уже существует и не является готовой установкой")
-                tool_dir.parent.mkdir(parents=True, exist_ok=True)
-                clone = ["git", "clone", "--filter=blob:none", "--recursive", str(tool.repo_url), str(tool_dir)]
-                with log_path.open("a", encoding="utf-8") as stream:
-                    subprocess.run(clone, stdout=stream, stderr=subprocess.STDOUT, text=True, check=True)
-                    subprocess.run(
-                        ["git", "-C", str(tool_dir), "checkout", tool.ref],
-                        stdout=stream,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        check=True,
-                    )
-                    subprocess.run(
-                        ["git", "-C", str(tool_dir), "submodule", "update", "--init", "--recursive"],
-                        stdout=stream,
-                        stderr=subprocess.STDOUT,
-                        text=True,
-                        check=True,
-                    )
-                commands = tool.install.commands or self._auto_install_commands(tool_dir)
+                self._clone(tool, tool_dir, log_path)
             else:
                 tool_dir.mkdir(parents=True, exist_ok=True)
-                commands = tool.install.commands
-            env_dir.mkdir(parents=True, exist_ok=True)
-            rendered = [self._render(command, tool, paths) for command in commands]
-            run_commands(rendered, cwd=tool_dir, env=self._environment(tool, paths), log_path=log_path)
-            commit = ""
-            if (tool_dir / ".git").exists():
-                commit = subprocess.check_output(
-                    ["git", "-C", str(tool_dir), "rev-parse", "HEAD"], text=True
-                ).strip()
-            (tool_dir / ".ai-lab-installed.json").write_text(
-                json.dumps({"tool": tool.id, "ref": tool.ref, "commit": commit}, indent=2),
+            context.env_dir.mkdir(parents=True, exist_ok=True)
+            commands = self.installer.commands(context)
+            self._append(log_path, f"\nУстановочные команды: {commands}\n")
+            run_commands(commands, cwd=tool_dir, env=self.environment(context), log_path=log_path)
+            (tool_dir / INSTALL_MARKER).write_text(
+                json.dumps(
+                    {
+                        "tool": tool.id,
+                        "ref": tool.ref,
+                        "commit": self._commit(tool_dir),
+                        "installed_at": datetime.now(UTC).isoformat(),
+                        "commands": commands,
+                    },
+                    indent=2,
+                ),
                 encoding="utf-8",
             )
 
         return self.jobs.submit("install", tool_id, task)
 
+    def _clone(self, tool: ToolManifest, tool_dir: Path, log_path: Path) -> None:
+        if tool_dir.exists() and any(tool_dir.iterdir()):
+            raise RuntimeError(f"{tool_dir} уже существует и не является готовой установкой")
+        tool_dir.parent.mkdir(parents=True, exist_ok=True)
+        with log_path.open("a", encoding="utf-8") as stream:
+            for command in (
+                ["git", "clone", "--filter=blob:none", str(tool.repo_url), str(tool_dir)],
+                ["git", "-C", str(tool_dir), "checkout", tool.ref],
+                ["git", "-C", str(tool_dir), "submodule", "update", "--init", "--recursive"],
+            ):
+                stream.write(f"\n$ {' '.join(command)}\n")
+                stream.flush()
+                subprocess.run(command, stdout=stream, stderr=subprocess.STDOUT, text=True, check=True)
+
+    def _commit(self, tool_dir: Path) -> str:
+        if not (tool_dir / ".git").exists():
+            return ""
+        try:
+            return subprocess.check_output(
+                ["git", "-C", str(tool_dir), "rev-parse", "HEAD"], text=True
+            ).strip()
+        except subprocess.CalledProcessError:
+            return ""
+
+    def _append(self, log_path: Path, text: str) -> None:
+        with log_path.open("a", encoding="utf-8") as stream:
+            stream.write(text)
+
+    # ----------------------------------------------------------------- models
+
     def download_models(self, tool_id: str) -> Job:
         tool = self.registry.get(tool_id)
         if tool.models.mode in {"disabled", "manual"}:
             raise RuntimeError(tool.models.instructions or "Модели скачиваются вручную")
-
-        def task(log_path: Path) -> None:
-            paths = self.paths(tool_id)
-            paths["model"].mkdir(parents=True, exist_ok=True)
-            commands = list(tool.models.commands)
-            if tool.models.mode == "huggingface":
-                for repo_id in tool.models.repo_ids:
-                    destination = paths["model"] / repo_id.replace("/", "--")
-                    commands.append(f"hf download {repo_id} --local-dir '{destination}'")
-            run_commands(
-                [self._render(command, tool, paths) for command in commands],
-                cwd=paths["tool"] if paths["tool"].exists() else self.settings.runtime_root,
-                env=self._environment(tool, paths),
-                log_path=log_path,
+        if tool.models.requires_hf_token and not os.getenv("HF_TOKEN"):
+            raise RuntimeError(
+                "Нужен HF_TOKEN. Добавьте RunPod Secret huggingface_token в шаблон Pod и перезапустите его."
             )
 
+        def task(log_path: Path) -> None:
+            context = self.context(tool)
+            context.model_dir.mkdir(parents=True, exist_ok=True)
+            commands = self.models.commands(context)
+            if not commands:
+                raise RuntimeError("В manifest не указано, что именно скачивать")
+            run_commands(
+                commands,
+                cwd=context.tool_dir if context.tool_dir.exists() else self.settings.runtime_root,
+                env=self.environment(context),
+                log_path=log_path,
+            )
+            missing = self.models.missing(context)
+            if missing:
+                raise RuntimeError(f"После загрузки не хватает файлов: {', '.join(missing)}")
+
         return self.jobs.submit("models", tool_id, task)
+
+    # -------------------------------------------------------------- workflows
 
     def download_workflows(self, tool_id: str) -> Job:
         tool = self.registry.get(tool_id)
@@ -168,8 +289,7 @@ class ToolManager:
             paths["workflow"].mkdir(parents=True, exist_ok=True)
             with log_path.open("a", encoding="utf-8") as stream:
                 for workflow in tool.workflows:
-                    filename = f"{workflow.name}.json"
-                    destination = paths["workflow"] / filename
+                    destination = paths["workflow"] / f"{workflow.name}.json"
                     if workflow.url:
                         stream.write(f"Downloading {workflow.url} -> {destination}\n")
                         urllib.request.urlretrieve(str(workflow.url), destination)
@@ -180,80 +300,125 @@ class ToolManager:
 
         return self.jobs.submit("workflows", tool_id, task)
 
+    # ----------------------------------------------------------------- launch
+
     def launch(self, tool_id: str) -> dict[str, object]:
         tool = self.registry.get(tool_id)
-        if tool.launch.mode == "comfyui":
-            return {"url": self.settings.comfyui_url, "external": True}
-        if tool.launch.mode == "web":
-            return {"url": str(tool.source_url), "external": True}
-        if tool.launch.mode != "process":
-            raise RuntimeError("Для инструмента пока нет автоматического запуска")
-        paths = self.paths(tool_id)
-        if not (paths["tool"] / ".ai-lab-installed.json").exists():
-            raise RuntimeError("Сначала установите программу")
-        command = self._render(tool.launch.command, tool, paths)
-        running = self.processes.start(
-            tool_id,
-            command,
-            cwd=paths["tool"],
-            env=self._environment(tool, paths),
-            port=tool.launch.port,
+        adapter = launch_adapter(tool)
+        if not adapter.needs_process:
+            return {"url": adapter.url(self.context(tool), self.settings), "external": True}
+
+        self._require_ready_to_run(tool)
+        port = self.processes.allocate_port(tool.launch.port)
+        context = self.context(tool, port=port)
+        spec = adapter.spec(context)
+        record = self.processes.start(
+            tool.id,
+            spec.command,
+            name=tool.name,
+            cwd=context.tool_dir,
+            env=self.environment(context),
+            port=spec.port,
+            path=spec.path,
+            health_type=spec.health_type,
+            health_path=spec.health_path,
+            startup_timeout_s=spec.startup_timeout_s,
         )
         return {
-            "url": self.settings.public_port_url(running.port) + tool.launch.path
-            if running.port
-            else "",
+            "url": adapter.url(context, self.settings),
             "external": True,
+            "pid": record.pid,
+            "internal_port": record.port,
         }
+
+    def _require_ready_to_run(self, tool: ToolManifest) -> None:
+        if tool.verified == "unavailable":
+            raise RuntimeError(tool.unavailable_reason)
+        if not self.is_installed(tool):
+            raise RuntimeError("Сначала установите программу")
+        context = self.context(tool)
+        if tool.models.mode not in {"disabled", "manual"} and not self.models.present(context):
+            missing = ", ".join(self.models.missing(context)) or "модели"
+            raise RuntimeError(f"Сначала скачайте модели: не хватает {missing}")
+
+    def open_url(self, tool_id: str) -> str:
+        tool = self.registry.get(tool_id)
+        adapter = launch_adapter(tool)
+        context = self.context(tool)
+        if adapter.needs_process:
+            running = self.processes.current()
+            if not running or running["tool_id"] != tool.id or running["status"] != STATUS_READY:
+                raise RuntimeError("Инструмент ещё не прошёл health-check — ссылка появится после запуска")
+        return adapter.url(context, self.settings)
+
+    # -------------------------------------------------------------------- run
 
     def run(self, tool_id: str, values: dict[str, str]) -> Job:
         tool = self.registry.get(tool_id)
-        if tool.run.mode != "command":
+        adapter = job_adapter(tool)
+        if adapter.type != "cli-job":
             raise RuntimeError("Для инструмента пока нет формы запуска")
-        paths = self.paths(tool_id)
-        if tool.kind == "standalone" and not (paths["tool"] / ".ai-lab-installed.json").exists():
-            raise RuntimeError("Сначала установите программу")
-        prepared: dict[str, str] = {}
-        for field in tool.run.fields:
-            raw = values.get(field.name, field.default).strip()
-            if field.required and not raw:
-                raise ValueError(f"Заполните поле «{field.label}»")
-            if field.type == "file" and raw:
-                raw = str(self.projects.resolve_asset(self.projects.active(), raw))
-            elif field.type == "number" and raw:
-                float(raw)
-            prepared[field.name] = shlex.quote(raw)
+        if tool.kind == "standalone":
+            self._require_ready_to_run(tool)
 
+        prepared = self._prepare_fields(tool, values)
+        stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
         project_dir = self.projects.path(self.projects.active())
-        output_dir = project_dir / "runs" / tool.id
+        output_dir = project_dir / "runs" / tool.id / stamp
         output_dir.mkdir(parents=True, exist_ok=True)
-        prepared.update(
-            {
-                "output_dir": shlex.quote(str(output_dir)),
-                "timestamp": datetime.now(UTC).strftime("%Y%m%d-%H%M%S"),
-            }
-        )
-        command = self._render(tool.run.command, tool, paths)
-        for marker, replacement in prepared.items():
-            command = command.replace("{" + marker + "}", replacement)
+
+        context = self.context(tool, output_dir=output_dir, values=prepared)
+        spec = adapter.spec(context)
+        env = self.environment(context)
 
         def task(log_path: Path) -> None:
             run_commands(
-                [command],
-                cwd=paths["tool"],
-                env=self._environment(tool, paths),
+                [spec.command],
+                cwd=context.tool_dir,
+                env=env,
                 log_path=log_path,
+                timeout=spec.timeout_s,
             )
 
-        return self.jobs.submit("run", tool_id, task)
+        job = self.jobs.submit("run", tool_id, task)
+        self.jobs.record_artifacts(job.id, [str(output_dir.relative_to(project_dir))])
+        return job
+
+    def _prepare_fields(self, tool: ToolManifest, values: dict[str, str]) -> dict[str, str]:
+        prepared: dict[str, str] = {}
+        active = self.projects.active()
+        for field in tool.run.fields:
+            raw = (values.get(field.name) or field.default).strip()
+            if field.required and not raw:
+                raise ValueError(f"Заполните поле «{field.label}»")
+            if field.type == "file" and raw:
+                raw = str(self.projects.resolve_asset(active, raw))
+            elif field.type == "number" and raw:
+                float(raw)
+            elif field.type == "select" and raw and field.choices and raw not in field.choices:
+                raise ValueError(f"Недопустимое значение поля «{field.label}»: {raw}")
+            prepared[field.name] = shlex.quote(raw)
+        return prepared
+
+    # ------------------------------------------------------------------ stop
 
     def stop(self, tool_id: str) -> None:
         self.processes.stop(tool_id)
 
+    def dismiss(self, tool_id: str) -> None:
+        self.processes.clear(tool_id)
+
+    def process_log(self, tool_id: str) -> str:
+        return self.processes.log(tool_id)
+
+    def process_error(self, tool_id: str) -> str:
+        return last_error_line(tail(self.settings.logs_dir / "processes" / f"process-{tool_id}.log"))
+
+    # ---------------------------------------------------------------- cleanup
+
     def delete_program(self, tool_id: str) -> None:
         tool = self.registry.get(tool_id)
-        running = self.processes.current()
-        if running and running["tool_id"] == tool.id:
+        if self.processes.occupied_by() == tool.id:
             raise RuntimeError("Сначала остановите инструмент")
         paths = self.paths(tool_id)
         self._safe_delete(paths["tool"], self.settings.tools_dir)
@@ -261,8 +426,7 @@ class ToolManager:
 
     def delete_models(self, tool_id: str) -> None:
         self.registry.get(tool_id)
-        path = self.paths(tool_id)["model"]
-        self._safe_delete(path, self.settings.models_dir)
+        self._safe_delete(self.paths(tool_id)["model"], self.settings.models_dir)
 
     def _safe_delete(self, path: Path, allowed_root: Path) -> None:
         resolved_root = allowed_root.resolve()
@@ -272,46 +436,31 @@ class ToolManager:
         if path.exists():
             shutil.rmtree(path)
 
-    def _auto_install_commands(self, tool_dir: Path) -> list[str]:
-        if (tool_dir / "pyproject.toml").exists() or (tool_dir / "uv.lock").exists():
-            return ["uv sync"]
-        if (tool_dir / "requirements.txt").exists():
-            return [
-                "uv venv '{env_dir}' --python 3.11",
-                "uv pip install --python '{env_dir}/bin/python' -r requirements.txt",
-            ]
-        return []
+    # ------------------------------------------------------------ environment
 
-    def _environment(self, tool: ToolManifest, paths: dict[str, Path]) -> dict[str, str]:
+    def environment(self, context: ToolContext) -> dict[str, str]:
         env = os.environ.copy()
-        project_dir = self.projects.path(self.projects.active())
         env.update(
             {
                 "AI_LAB_ROOT": str(self.settings.runtime_root),
-                "AI_LAB_TOOL_ID": tool.id,
-                "AI_LAB_TOOL_DIR": str(paths["tool"]),
-                "AI_LAB_ENV_DIR": str(paths["env"]),
-                "AI_LAB_MODEL_DIR": str(paths["model"]),
-                "AI_LAB_PROJECT_DIR": str(project_dir),
-                "HF_HOME": str(self.settings.runtime_root / "cache" / "huggingface"),
-                "MODELSCOPE_CACHE": str(self.settings.runtime_root / "cache" / "modelscope"),
-                "UV_PROJECT_ENVIRONMENT": str(paths["env"]),
-                "PORT": str(tool.launch.port or 7860),
+                "AI_LAB_TOOL_ID": context.tool.id,
+                "AI_LAB_TOOL_DIR": str(context.tool_dir),
+                "AI_LAB_ENV_DIR": str(context.env_dir),
+                "AI_LAB_MODEL_DIR": str(context.model_dir),
+                "AI_LAB_PROJECT_DIR": str(context.project_dir),
+                "HF_HOME": str(self.settings.cache_dir / "huggingface"),
+                "HF_HUB_ENABLE_HF_TRANSFER": os.getenv("HF_HUB_ENABLE_HF_TRANSFER", "0"),
+                "MODELSCOPE_CACHE": str(self.settings.cache_dir / "modelscope"),
+                "UV_PROJECT_ENVIRONMENT": str(context.env_dir),
+                "UV_CACHE_DIR": str(self.settings.cache_dir / "uv"),
+                "PYTHONUNBUFFERED": "1",
             }
         )
-        env["PATH"] = f"{paths['env'] / 'bin'}:{env.get('PATH', '')}"
+        if context.port:
+            env["PORT"] = str(context.port)
+            env["GRADIO_SERVER_PORT"] = str(context.port)
+            env["GRADIO_SERVER_NAME"] = "0.0.0.0"
+        if context.output_dir is not None:
+            env["AI_LAB_OUTPUT_DIR"] = str(context.output_dir)
+        env["PATH"] = f"{context.env_dir / 'bin'}:{env.get('PATH', '')}"
         return env
-
-    def _render(self, value: str, tool: ToolManifest, paths: dict[str, Path]) -> str:
-        replacements = {
-            "{template_root}": str(self.settings.template_root),
-            "{tool_dir}": str(paths["tool"]),
-            "{env_dir}": str(paths["env"]),
-            "{model_dir}": str(paths["model"]),
-            "{workflow_dir}": str(paths["workflow"]),
-            "{project_dir}": str(self.projects.path(self.projects.active())),
-            "{port}": str(tool.launch.port or 7860),
-        }
-        for marker, replacement in replacements.items():
-            value = value.replace(marker, replacement)
-        return value

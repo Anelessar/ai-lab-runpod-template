@@ -28,6 +28,6 @@ runpodctl template create \
   --image "$IMAGE" \
   --container-disk-in-gb "$CONTAINER_GB" \
   --volume-in-gb 0 \
-  --ports "3000/http,8188/http,8888/http,7860/http,8001/http,8080/http" \
+  --ports "3000/http,7860/http,8188/http,8888/http" \
   --env "$TEMPLATE_ENV" \
-  --readme "Disposable AI Lab: Launcher :3000, ComfyUI :8188, Jupyter :8888. No persistent volume. Export the project ZIP before stopping the Pod."
+  --readme "Disposable AI Lab: Launcher :3000, standalone tool UI :7860, ComfyUI :8188, Jupyter :8888. Every one of these four ports has a service that starts at boot, so none of them should stay on Initializing. No persistent volume - export the project ZIP before stopping the Pod."

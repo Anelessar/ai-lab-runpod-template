@@ -66,3 +66,23 @@ main { width: min(1500px, 94vw); margin: 28px auto 80px; display: grid; gap: 38p
 .log { white-space: pre-wrap; padding: 20px; background: #08090b; border: 1px solid var(--border); border-radius: 12px; }
 [hidden] { display: none !important; }
 @media (max-width: 850px) { .topbar { position: static; flex-wrap: wrap; } .workspace { grid-template-columns: 1fr; } .asset-grid, .tool-grid { grid-template-columns: 1fr; } }
+
+/* Pod ports panel: one card per RunPod-declared port with its live state. */
+.services { display: grid; gap: 0.75rem; }
+.service-grid { display: grid; gap: 0.75rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+.service { border: 1px solid #2a2f3a; border-radius: 0.6rem; padding: 0.75rem; }
+.service-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+.service-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+.service.ready { border-color: #2f6d46; }
+.service.failed { border-color: #7a3030; }
+
+.chip.bad { background: #3a1f1f; color: #ffb4b4; }
+.chip.verified-unavailable { background: #3a1f1f; color: #ffb4b4; }
+.chip.verified-catalogued { background: #2a2f3a; color: #9aa3b2; }
+.chip.verified-installable { background: #2b3550; color: #b9ccff; }
+.chip.verified-launchable { background: #24402f; color: #a7e3bf; }
+.chip.verified-smoke-tested { background: #1f4d33; color: #b6f5cf; }
+
+.notice.inline { margin: 0.5rem 0; padding: 0.5rem 0.65rem; font-size: 0.85rem; }
+.tool-card code { word-break: break-all; }
+.run-form small { display: block; margin-top: 0.2rem; }

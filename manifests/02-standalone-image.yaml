@@ -1,3 +1,11 @@
+# Standalone image tools.
+#
+# `verified` is evidence, not intent:
+#   catalogued   - documented here, but setup is manual
+#   installable  - AI Lab automates install/weights with the commands the pinned
+#                  commit documents for itself; GPU launch not yet performed
+#   launchable   - launch command reached its health check in a Pod
+#   smoke-tested - a real run produced an artifact
 tools:
   - id: ideogram-4
     name: Ideogram 4
@@ -9,6 +17,7 @@ tools:
     priority: must
     access: free
     adapter_status: ready
+    verified: catalogued
     license_note: Код Apache-2.0; веса Ideogram 4 доступны после принятия gated Non-Commercial лицензии. Для коммерческого использования нужна отдельная лицензия Ideogram.
     requirements: ["24 GB VRAM для NF4", "HF_TOKEN и принятая лицензия модели"]
     inputs: [text, json]
@@ -30,6 +39,7 @@ tools:
     repo_url: https://github.com/microsoft/Mage
     priority: must
     adapter_status: ready
+    verified: catalogued
     requirements: ["18–20 GB VRAM для BF16", "NVIDIA GPU"]
     inputs: [text, image]
     outputs: [image]
@@ -52,6 +62,7 @@ tools:
     repo_url: https://github.com/baidu/ernie-image
     priority: mid
     adapter_status: ready
+    verified: catalogued
     requirements: ["NVIDIA GPU"]
     inputs: [text]
     outputs: [image]
@@ -70,14 +81,24 @@ tools:
     description: Агентный pipeline, превращающий flattened raster design в иерархию текста, объектов и редактируемых слоёв.
     source_url: https://github.com/jintae-00/ReDesign
     repo_url: https://github.com/jintae-00/ReDesign
+    ref: 5023ec3aca2b6c39876c34cc7f1d30a85f70396d
     priority: must
-    adapter_status: catalogued
-    requirements: ["80 GB-class GPU", "локальный или OpenAI-compatible VLM"]
+    adapter_status: manual
+    verified: catalogued
+    license_spdx: NOASSERTION
+    license_note: Лицензия в репозитории не сводится к стандартной SPDX-строке; проверить LICENSE перед любым использованием.
+    entrypoint: "conda env create -f environment.yml && bash post_install.sh && python -m ReDesign.run_single_image"
+    vram_gb: 80
+    requirements: ["80 GB-class GPU", "локальный или OpenAI-compatible VLM endpoint"]
     inputs: [image]
     outputs: [image, layers, json]
     pipeline: "design PNG → OCR/VLM/segmentation/Qwen Layered → JSON + layers"
-    install: {mode: git-auto, instructions: "Репозиторий ставится отдельно; VLM endpoint и auxiliary models настраиваются после установки."}
-    models: {mode: manual, instructions: "Скачать Qwen-Image-Layered, segmentation/inpainting и остальные зависимости по README."}
+    install:
+      mode: manual
+      instructions: "Официальная установка — conda environment.yml плюс post_install.sh, который доставляет PyTorch cu128, PaddlePaddle, diffusers из git, sam2 и CUDA-расширение GroundingDINO. Это не воспроизводится в изолированном uv-окружении AI Lab, поэтому кнопки установки нет: ставить вручную в Pod."
+    models:
+      mode: manual
+      instructions: "python scripts/download_checkpoints.py --with-qwen скачивает tool/eval checkpoints и Qwen-Image-Layered. Дополнительно нужен OpenAI-совместимый VLM endpoint, прописанный в config.py."
     launch: {mode: disabled}
 
   - id: spatialedit
@@ -87,14 +108,23 @@ tools:
     description: 16B checkpoint для перемещения, вращения и изменения viewpoint отдельных объектов.
     source_url: https://github.com/EasonXiao-888/SpatialEdit
     repo_url: https://github.com/EasonXiao-888/SpatialEdit
+    ref: 8b0b3519e88a7f91213f8ad4cf079f8f27f1d91d
     priority: must
-    adapter_status: catalogued
+    adapter_status: manual
+    verified: catalogued
+    license_spdx: MIT
+    license_note: Код MIT; веса SpatialEdit-16B проверить отдельно.
+    entrypoint: "python spatialedit_demo.py"
     requirements: ["мощная NVIDIA GPU"]
     inputs: [image, text]
     outputs: [image]
     pipeline: "image + spatial instruction → SpatialEdit → PNG → QA"
-    install: {mode: git-auto, instructions: "Официальный Python pipeline устанавливается в изолированное окружение."}
-    models: {mode: manual, instructions: "Скачать SpatialEdit-16B weights и указать путь в demo config."}
+    install:
+      mode: manual
+      instructions: "pip install -r requirements.txt плюс accelerate/peft/gradio. Автозапуск не заводится по другой причине: spatialedit_demo.py не принимает аргументов — пути к базовой модели и LoRA-чекпоинтам зашиты в самом файле и их нужно править руками перед стартом."
+    models:
+      mode: manual
+      instructions: "Скачать SpatialEdit-16B weights и вписать путь в spatialedit_demo.py."
     launch: {mode: disabled}
 
   - id: hifi-inpaint
@@ -104,15 +134,34 @@ tools:
     description: Reference-guided inpainting с отдельными condition image, mask и prompt.
     source_url: https://github.com/Correr-Zhou/HiFi-Inpaint
     repo_url: https://github.com/Correr-Zhou/HiFi-Inpaint
+    ref: 606a21e7e15247b14047d4993e778259a47ce0d0
     priority: must
     adapter_status: catalogued
-    requirements: ["NVIDIA GPU"]
+    verified: installable
+    license_spdx: Apache-2.0
+    license_note: Код Apache-2.0; базовая FLUX-модель под собственной лицензией BFL — проверить перед коммерческим использованием.
+    entrypoint: "python inference.py --base_model_path ... --lora_path ... --ref_image ... --mask_image ... --output ..."
+    requirements: ["NVIDIA GPU", "базовая FLUX-модель"]
     inputs: [image, mask, reference, text]
     outputs: [image]
     pipeline: "image + mask + reference + prompt → HiFi-Inpaint → PNG"
-    install: {mode: git-auto, instructions: "Официальный inference/Gradio устанавливается в отдельное окружение."}
-    models: {mode: manual, instructions: "Скачать базовую FLUX-модель и HiFi-Inpaint checkpoints согласно README."}
+    install:
+      mode: git-auto
+      python_version: "3.11"
+      instructions: "Закреплённый commit и requirements.txt ставятся в отдельное uv-окружение."
+    models:
+      mode: manual
+      instructions: "Нужны базовая FLUX-модель и LoRA HiFi-Inpaint; README не публикует прямых ссылок с фиксированными путями, поэтому пути указываются в форме запуска вручную."
     launch: {mode: disabled}
+    run:
+      mode: command
+      command: "'{env_dir}/bin/python' inference.py --base_model_path {base_model_path} --lora_path {lora_path} --ref_image {ref_image} --mask_image {mask_image} --prompt {prompt} --output '{output_dir}/hifi-inpaint.png'"
+      fields:
+        - {name: base_model_path, label: Путь к базовой FLUX-модели, type: text, help: "Каталог или .safetensors внутри Pod"}
+        - {name: lora_path, label: Путь к HiFi-Inpaint LoRA, type: text}
+        - {name: ref_image, label: Reference image, type: file}
+        - {name: mask_image, label: Маска, type: file}
+        - {name: prompt, label: Prompt, type: textarea, required: false, default: " "}
 
   - id: hunyuanimage-3-instruct
     name: HunyuanImage-3.0-Instruct
@@ -122,11 +171,15 @@ tools:
     source_url: https://huggingface.co/tencent/HunyuanImage-3.0-Instruct
     priority: must
     adapter_status: manual
+    verified: catalogued
+    entrypoint: "официальный inference-код из model card"
     requirements: ["несколько мощных GPU"]
     inputs: [image, text]
     outputs: [image]
     pipeline: "image + инструкция → HunyuanImage Instruct → PNG → QA"
-    install: {mode: manual, instructions: "Использовать официальный inference-код, указанный в model card; отдельного стабильного WebUI adapter пока нет."}
+    install:
+      mode: manual
+      instructions: "Отдельного репозитория с installer нет — только inference-код в model card, рассчитанный на multi-GPU. Одноразовый Pod AI Lab с одной GPU для него не подходит."
     models: {mode: manual, instructions: "Скачать checkpoint с Hugging Face вручную после проверки требований к GPU."}
     launch: {mode: disabled}
 
@@ -138,11 +191,15 @@ tools:
     source_url: https://huggingface.co/huawei-bayerlab/windowseat-reflection-removal-v1-0
     priority: must
     adapter_status: manual
+    verified: catalogued
+    entrypoint: "inference-сниппет из model card"
     requirements: ["NVIDIA GPU"]
     inputs: [image]
     outputs: [image]
     pipeline: "photo through glass → WindowSeat → reflection-free PNG → QA"
-    install: {mode: manual, instructions: "Запускается официальным inference из model card; отдельного репозитория с универсальным WebUI нет."}
+    install:
+      mode: manual
+      instructions: "Кода в виде репозитория нет — только model card с inference-сниппетом. Закреплять commit нечего, поэтому автоматической установки тоже нет."
     models: {mode: manual, instructions: "Скачать Huawei BayerLab checkpoint вручную."}
     launch: {mode: disabled}
 
@@ -154,11 +211,15 @@ tools:
     source_url: https://riko0.github.io/VIBE/
     priority: must
     adapter_status: manual
+    verified: catalogued
+    entrypoint: "inference-сниппет из model card / Hugging Face Space"
     requirements: ["NVIDIA GPU"]
     inputs: [image, text]
     outputs: [image]
     pipeline: "image + инструкция → VIBE → PNG → comparison"
-    install: {mode: manual, instructions: "Использовать официальный Hugging Face Space или model-card inference; стабильного отдельного repo installer нет."}
+    install:
+      mode: manual
+      instructions: "У проекта есть страница и веса, но нет репозитория с installer и зафиксированным commit, поэтому автоматическая установка не заводится."
     models: {mode: manual, instructions: "Скачать iitolstykh/VIBE-Image-Edit либо DistilledCFG checkpoint."}
     launch: {mode: disabled}
 
@@ -169,15 +230,39 @@ tools:
     description: Unified generation/detection research pipeline, полезный как специализированная evaluation/editing ветка.
     source_url: https://github.com/Zhangyr2022/UniGenDet
     repo_url: https://github.com/Zhangyr2022/UniGenDet
+    ref: 94e039dec7c255998900f134b3a7ca3447e8f08e
     priority: must
     adapter_status: catalogued
-    requirements: ["BAGEL checkpoint", "NVIDIA GPU"]
+    verified: installable
+    license_spdx: MIT
+    license_note: Код MIT; BAGEL-7B-MoT под собственной лицензией ByteDance-Seed.
+    entrypoint: "python demo.py --mode t2i|detection --model_path ./pretrained/bagel_7b_mot --output_dir ..."
+    download_gb: 29
+    requirements: ["BAGEL-7B-MoT checkpoint", "NVIDIA GPU", "сборка flash_attn при установке"]
     inputs: [text, image]
     outputs: [image, json]
     pipeline: "prompt/image → UniGenDet generation/detection mode → PNG/JSON"
-    install: {mode: git-auto, instructions: "Код устанавливается автоматически; выбранный generation/detection preset настраивается по README."}
-    models: {mode: manual, instructions: "Скачать совместимый BAGEL checkpoint в папку pretrained."}
+    install:
+      mode: git-auto
+      python_version: "3.10"
+      commands:
+        - "uv venv '{env_dir}' --python 3.10"
+        - "uv pip install --python '{env_dir}/bin/python' -r requirements.txt"
+        - "uv pip install --python '{env_dir}/bin/python' --no-build-isolation flash_attn==2.5.8"
+      instructions: "flash_attn собирается из исходников под фактическую GPU — первая установка занимает десятки минут."
+    models:
+      mode: huggingface
+      repo_ids: [ByteDance-Seed/BAGEL-7B-MoT]
+      size_gb: 29
+      check: ["ByteDance-Seed--BAGEL-7B-MoT"]
+      instructions: "demo.py по умолчанию ждёт ./pretrained/bagel_7b_mot; AI Lab передаёт путь к скачанной копии через --model_path."
     launch: {mode: disabled}
+    run:
+      mode: command
+      command: "'{env_dir}/bin/python' demo.py --mode {mode} --model_path '{model_dir}/ByteDance-Seed--BAGEL-7B-MoT' --prompt {prompt} --output_dir '{output_dir}'"
+      fields:
+        - {name: mode, label: Режим, type: select, choices: [t2i, detection], default: t2i}
+        - {name: prompt, label: Prompt, type: textarea}
 
   - id: gen-searcher
     name: GenSearcher
@@ -187,6 +272,7 @@ tools:
     source_url: https://gen-searcher.vercel.app/
     priority: must
     adapter_status: ready
+    verified: catalogued
     inputs: [text]
     outputs: [data]
     pipeline: "поисковый запрос → web UI → сохранить находки в brief"

@@ -6,18 +6,37 @@ tools:
     description: Massively multilingual zero-shot TTS для 600+ языков с cloning, voice design и pronunciation control.
     source_url: https://github.com/k2-fsa/OmniVoice
     repo_url: https://github.com/k2-fsa/OmniVoice
+    ref: 38e992bc60f85548faeb77e8fa70158ba71deb30
     priority: must
-    adapter_status: ready
+    adapter_status: catalogued
+    verified: installable
+    license_spdx: Apache-2.0
+    license_note: Код Apache-2.0; проверить права на любые reference-голоса перед клонированием.
+    entrypoint: "omnivoice-demo --ip 0.0.0.0 --port N (web UI) либо omnivoice-infer --model k2-fsa/OmniVoice --text ... --output ..."
     requirements: ["NVIDIA GPU рекомендуется"]
     inputs: [text, audio]
     outputs: [audio]
-    pipeline: "text + language/reference voice → OmniVoice → WAV → ASR QA"
-    install: {mode: git-auto, instructions: "Официальный пакет устанавливается в отдельное uv-окружение."}
-    models: {mode: manual, instructions: "Первый запуск скачивает нужные checkpoints; при gated моделях передать HF_TOKEN через RunPod Secret."}
+    pipeline: "text + language/reference voice → OmniVoice → WAV в runs/ → ASR QA"
+    install:
+      mode: git-auto
+      commands: ["uv sync"]
+      instructions: "Официальный пакет и его uv-окружение ставятся из закреплённого commit."
+    models:
+      mode: disabled
+      instructions: "Отдельная кнопка не нужна: и demo, и CLI сами тянут k2-fsa/OmniVoice с Hugging Face при первом запуске в общий кэш HF_HOME. Для gated-моделей HF_TOKEN приходит из RunPod Secret."
     launch:
       mode: process
-      command: "omnivoice-demo --ip 0.0.0.0 --port {port}"
-      port: 8001
+      ui: gradio
+      command: "uv run omnivoice-demo --ip 127.0.0.1 --port {port}"
+      startup_timeout_s: 900
+    run:
+      mode: command
+      command: "uv run omnivoice-infer --model k2-fsa/OmniVoice --text {text} --language {language} --output '{output_dir}/omnivoice.wav'"
+      timeout_s: 3600
+      smoke_command: "uv run omnivoice-infer --help"
+      fields:
+        - {name: text, label: Текст, type: textarea}
+        - {name: language, label: Код языка, type: text, required: false, default: en}
 
   - id: moss-tts-1-5
     name: MOSS-TTS v1.5
@@ -26,15 +45,40 @@ tools:
     description: Локальный multilingual TTS на 31 язык с voice cloning, prosody/pause control и длинными references.
     source_url: https://github.com/OpenMOSS/MOSS-TTS
     repo_url: https://github.com/OpenMOSS/MOSS-TTS
+    ref: 58b20a0d5fcc6766658d50967a90a9d890009a46
     priority: must
     adapter_status: catalogued
-    requirements: ["мощная NVIDIA GPU"]
+    verified: installable
+    license_spdx: Apache-2.0
+    license_note: Код Apache-2.0; проверить права на reference-голоса.
+    entrypoint: "python clis/moss_tts_local_v1.5_app.py --host 0.0.0.0 --port N --model-dir ... --codec-dir ..."
+    download_gb: 12
+    requirements: ["мощная NVIDIA GPU", "CUDA 12.8"]
     inputs: [text, audio]
     outputs: [audio]
-    pipeline: "text + language/style/reference → MOSS-TTS → 48 kHz WAV → QA"
-    install: {mode: git-auto, instructions: "Официальный Transformers/Gradio stack ставится в изолированное окружение."}
-    models: {mode: manual, instructions: "Скачать MOSS-TTS-v1.5 либо Local-Transformer-v1.5 по README."}
-    launch: {mode: disabled}
+    pipeline: "text + language/style/reference → MOSS-TTS Local v1.5 → 48 kHz WAV → QA"
+    install:
+      mode: git-auto
+      python_version: "3.12"
+      commands:
+        - "uv venv '{env_dir}' --python 3.12"
+        - "uv pip install --python '{env_dir}/bin/python' --torch-backend cu128 -e '.[torch-runtime]'"
+      instructions: "Ставится официальный torch-runtime extra без flash-attn: сборка flash-attn занимает десятки минут, а приложение принимает --attn-implementation sdpa."
+    models:
+      mode: huggingface
+      repo_ids:
+        - OpenMOSS-Team/MOSS-TTS-Local-Transformer-v1.5
+        - OpenMOSS-Team/MOSS-Audio-Tokenizer-v2
+      size_gb: 12
+      check:
+        - "OpenMOSS-Team--MOSS-TTS-Local-Transformer-v1.5"
+        - "OpenMOSS-Team--MOSS-Audio-Tokenizer-v2"
+      instructions: "4B-чекпоинт MossTTSLocal v1.5 и аудио-токенизатор v2; пути передаются приложению через --model-dir и --codec-dir."
+    launch:
+      mode: process
+      ui: fastapi
+      command: "'{env_dir}/bin/python' clis/moss_tts_local_v1.5_app.py --host 127.0.0.1 --port {port} --model-dir '{model_dir}/OpenMOSS-Team--MOSS-TTS-Local-Transformer-v1.5' --codec-dir '{model_dir}/OpenMOSS-Team--MOSS-Audio-Tokenizer-v2' --output-dir '{project_dir}/runs/moss-tts-1-5' --attn-implementation sdpa"
+      startup_timeout_s: 900
 
   - id: indextts-2-5
     name: IndexTTS-2.5
@@ -45,8 +89,13 @@ tools:
     repo_url: https://github.com/index-tts/index-tts
     ref: 4f8792ff120cd3ea470dd511e997a17c86cddd10
     priority: must
-    adapter_status: ready
+    adapter_status: catalogued
+    verified: installable
+    license_spdx: NOASSERTION
     license_note: Специальная Bilibili Model Use License; перед коммерческой работой проверить условия и при необходимости связаться с командой.
+    entrypoint: "uv run webui.py --host 0.0.0.0 --port N --model_dir <checkpoints> --version 2.5"
+    vram_gb: 6
+    download_gb: 6
     requirements: ["около 6 GB VRAM", "CUDA 12.8 рекомендуется"]
     inputs: [text, audio]
     outputs: [audio]
@@ -58,12 +107,16 @@ tools:
     models:
       mode: huggingface
       repo_ids: [IndexTeam/IndexTTS-2.5]
-      instructions: "Checkpoint скачивается в отдельную model-папку; small auxiliary models догружаются при первом старте."
       size_gb: 6
+      check: ["IndexTeam--IndexTTS-2.5"]
+      instructions: "Checkpoint скачивается в отдельную model-папку; мелкие вспомогательные модели догружаются при первом старте."
     launch:
       mode: process
-      command: "GRADIO_SERVER_NAME=0.0.0.0 GRADIO_SERVER_PORT={port} AI_LAB_INDEX_MODEL_DIR='{model_dir}/IndexTeam--IndexTTS-2.5' uv run webui.py --model_dir '{model_dir}/IndexTeam--IndexTTS-2.5'"
-      port: 7860
+      ui: gradio
+      # webui.py passes --port straight into demo.launch(server_port=...), so the
+      # GRADIO_SERVER_PORT environment variable alone is ignored here.
+      command: "uv run webui.py --host 127.0.0.1 --port {port} --version 2.5 --model_dir '{model_dir}/IndexTeam--IndexTTS-2.5'"
+      startup_timeout_s: 900
 
   - id: midashenglm-gen
     name: MiDashengLM-Gen
@@ -74,26 +127,31 @@ tools:
     repo_url: https://github.com/xiaomi-research/midashenglm-gen
     ref: fcebd304948d146fc37616b28a5d781edba5408d
     priority: must
-    adapter_status: ready
+    adapter_status: catalogued
+    verified: installable
+    license_spdx: Apache-2.0
     license_note: Apache 2.0 с ограничениями на незаконное, вредоносное, нарушающее права и военное применение.
+    entrypoint: "uv run python infer.py --text ... --output_dir ..."
     requirements: ["NVIDIA GPU", "выход 16 kHz mono"]
     inputs: [text]
     outputs: [audio]
-    pipeline: "structured scene/speech/music/SFX prompt → MiDashengLM-Gen → mono WAV → QA"
+    pipeline: "structured scene/speech/music/SFX prompt → MiDashengLM-Gen → mono WAV в runs/ → QA"
     install:
       mode: git-auto
       commands: ["uv sync"]
       instructions: "Закреплённый официальный commit устанавливается через uv."
     models:
-      mode: huggingface
-      repo_ids: [mispeech/midashenglm-gen]
-      instructions: "Скачивается официальный Transformers checkpoint."
+      mode: disabled
+      instructions: "Кнопка не нужна: infer.py сам скачивает checkpoint с Zenodo при первом запуске. Если чекпоинт уже лежит локально, путь можно передать через --resume."
     launch: {mode: disabled}
     run:
       mode: command
-      command: "uv run python '{template_root}/adapters/run_midasheng.py' --model '{model_dir}/mispeech--midashenglm-gen' --text {scene_prompt} --output '{output_dir}/midasheng-{timestamp}.wav'"
+      command: "uv run python infer.py --text {scene_prompt} --output_dir '{output_dir}' --seed {seed}"
+      timeout_s: 3600
+      smoke_command: "uv run python infer.py --help"
       fields:
-        - {name: scene_prompt, label: Structured audio-scene prompt, type: textarea}
+        - {name: scene_prompt, label: Structured audio-scene prompt, type: textarea, help: "Теги <|caption|> <|asr|> <|speech|> <|music|> <|sfx|> <|env|>"}
+        - {name: seed, label: Seed, type: number, required: false, default: "0"}
 
   - id: longcat-audiodit
     name: LongCat-AudioDiT 1B
@@ -102,15 +160,36 @@ tools:
     description: Компактная diffusion speech/audio модель с voice cloning.
     source_url: https://github.com/meituan-longcat/LongCat-AudioDiT
     repo_url: https://github.com/meituan-longcat/LongCat-AudioDiT
+    ref: 12c76b51d2a8aa6b6c9af5b25cd5ff8f7aa8178a
     priority: mid
     adapter_status: catalogued
+    verified: installable
+    license_spdx: MIT
+    license_note: Код MIT; лицензию весов и права на reference-голоса проверить отдельно.
+    entrypoint: "python inference.py --text ... --output_audio ... --model_dir ..."
     requirements: ["NVIDIA GPU"]
     inputs: [text, audio]
     outputs: [audio]
-    pipeline: "text + reference voice → LongCat-AudioDiT → WAV → QA"
-    install: {mode: git-auto, instructions: "Официальный inference repo ставится отдельно."}
-    models: {mode: manual, instructions: "Скачать checkpoint по README и передавать reference audio явно."}
+    pipeline: "text + reference voice → LongCat-AudioDiT → WAV в runs/ → QA"
+    install:
+      mode: git-auto
+      python_version: "3.10"
+      instructions: "Закреплённый commit и requirements.txt ставятся в отдельное uv-окружение."
+    models:
+      mode: huggingface
+      repo_ids: [meituan-longcat/LongCat-AudioDiT-1B]
+      size_gb: 3
+      check: ["meituan-longcat--LongCat-AudioDiT-1B"]
+      instructions: "inference.py принимает --model_dir, поэтому веса живут в отдельной model-папке AI Lab."
     launch: {mode: disabled}
+    run:
+      mode: command
+      command: "'{env_dir}/bin/python' inference.py --text {text} --output_audio '{output_dir}/longcat.wav' --model_dir '{model_dir}/meituan-longcat--LongCat-AudioDiT-1B' --nfe {nfe}"
+      timeout_s: 3600
+      smoke_command: "'{env_dir}/bin/python' inference.py --help"
+      fields:
+        - {name: text, label: Текст, type: textarea}
+        - {name: nfe, label: Шагов ODE, type: number, required: false, default: "16"}
 
   - id: miotts
     name: MioTTS-2.6B
@@ -120,11 +199,15 @@ tools:
     source_url: https://huggingface.co/Aratako/MioTTS-2.6B
     priority: mid
     adapter_status: manual
+    verified: catalogued
+    entrypoint: "Python/Gradio-сниппет из model card"
     requirements: ["NVIDIA GPU"]
     inputs: [text, audio]
     outputs: [audio]
     pipeline: "text + approved voice reference → MioTTS → WAV → QA"
-    install: {mode: manual, instructions: "Использовать Python/Gradio instructions из model card; отдельный официальный installer repo не указан."}
+    install:
+      mode: manual
+      instructions: "Есть только model card со сниппетом; официального репозитория с installer и закрепляемым commit нет, поэтому автоустановки нет."
     models: {mode: manual, instructions: "Скачать Aratako/MioTTS-2.6B вручную."}
     launch: {mode: disabled}
 
@@ -136,12 +219,15 @@ tools:
     source_url: https://www.hume.ai/blog/opensource-tada
     priority: mid
     adapter_status: manual
+    verified: unavailable
+    unavailable_reason: "Есть только блог-анонс Hume: официальный inference-репозиторий и точные веса для 1B/3B в AI Lab не зафиксированы, поэтому закреплять нечего и обещать запуск нельзя."
+    entrypoint: "не зафиксирован"
     requirements: ["NVIDIA GPU либо edge-устройство для 1B"]
     inputs: [text, audio]
     outputs: [audio]
     pipeline: "text + optional speech context → TADA → WAV → QA"
-    install: {mode: manual, instructions: "Установить официальный inference, на который ссылается Hume; repo URL нужно фиксировать после выбора 1B/3B."}
-    models: {mode: manual, instructions: "Выбрать и скачать 1B либо 3B checkpoint."}
+    install: {mode: manual, instructions: "Сначала нужно найти и зафиксировать официальный репозиторий, на который ссылается Hume."}
+    models: {mode: manual, instructions: "Выбрать и скачать 1B либо 3B checkpoint после того, как источник зафиксирован."}
     launch: {mode: disabled}
 
   - id: vibevoice-realtime
@@ -151,15 +237,32 @@ tools:
     description: Компактный streaming TTS Microsoft для low-latency voice previews и realtime avatar prototypes.
     source_url: https://github.com/microsoft/VibeVoice
     repo_url: https://github.com/microsoft/VibeVoice
+    ref: 94da20d98b2fa7688e9cbfaf7692ddb4954f7600
     priority: mid
     adapter_status: catalogued
+    verified: installable
+    license_spdx: MIT
+    license_note: Код MIT; отдельно проверить лицензию весов VibeVoice-Realtime-0.5B.
+    entrypoint: "python demo/vibevoice_realtime_demo.py --port N --model_path microsoft/VibeVoice-Realtime-0.5B"
     requirements: ["NVIDIA GPU рекомендуется"]
     inputs: [text]
     outputs: [audio]
-    pipeline: "streaming text → VibeVoice → audio chunks → WAV/player"
-    install: {mode: git-auto, instructions: "Официальный realtime inference ставится отдельно."}
-    models: {mode: manual, instructions: "Скачать VibeVoice-Realtime 0.5B и experimental voices по README."}
-    launch: {mode: disabled}
+    pipeline: "streaming text → VibeVoice Realtime → audio chunks → WAV/player"
+    install:
+      mode: git-auto
+      commands: ["uv sync"]
+      instructions: "Закреплённый commit и pyproject ставятся через uv."
+    models:
+      mode: huggingface
+      repo_ids: [microsoft/VibeVoice-Realtime-0.5B]
+      size_gb: 2
+      check: ["microsoft--VibeVoice-Realtime-0.5B"]
+      instructions: "Демо принимает --model_path, поэтому веса скачиваются в отдельную model-папку AI Lab."
+    launch:
+      mode: process
+      ui: fastapi
+      command: "uv run python demo/vibevoice_realtime_demo.py --port {port} --model_path '{model_dir}/microsoft--VibeVoice-Realtime-0.5B'"
+      startup_timeout_s: 900
 
   - id: qwen3-asr
     name: Qwen3-ASR 1.7B / 0.6B
@@ -168,15 +271,40 @@ tools:
     description: Локальный ASR на 52 языка/диалекта с отдельным ForcedAligner для точных timestamps.
     source_url: https://github.com/QwenLM/Qwen3-ASR
     repo_url: https://github.com/QwenLM/Qwen3-ASR
+    ref: 7c6daf77a2421100f5fb066495372c00129d39ff
     priority: must
     adapter_status: catalogued
+    verified: installable
+    license_spdx: Apache-2.0
+    license_note: Код и веса Apache-2.0.
+    entrypoint: "pip install qwen-asr, затем Python API Qwen3ASRModel.transcribe (готового CLI проект не публикует)"
+    download_gb: 4
     requirements: ["NVIDIA GPU для быстрого inference"]
     inputs: [audio, video]
     outputs: [text, json]
-    pipeline: "audio/video → Qwen3-ASR → transcript → ForcedAligner → subtitles/JSON"
-    install: {mode: git-auto, instructions: "Официальный qwen-asr package/репозиторий ставится отдельно."}
-    models: {mode: manual, instructions: "Скачать 1.7B либо 0.6B и ForcedAligner checkpoint по README."}
+    pipeline: "audio/video → Qwen3-ASR → transcript.txt и transcript.json в runs/"
+    install:
+      mode: commands
+      python_version: "3.12"
+      commands:
+        - "uv venv '{env_dir}' --python 3.12"
+        - "uv pip install --python '{env_dir}/bin/python' 'qwen-asr' soundfile"
+      instructions: "Клонировать репозиторий не нужно — официальный способ установки это пакет qwen-asr с PyPI."
+    models:
+      mode: huggingface
+      repo_ids: [Qwen/Qwen3-ASR-1.7B]
+      size_gb: 4
+      check: ["Qwen--Qwen3-ASR-1.7B"]
+      instructions: "Скачивается 1.7B; 0.6B и ForcedAligner при необходимости добавляются тем же способом."
     launch: {mode: disabled}
+    run:
+      mode: command
+      command: "'{env_dir}/bin/python' '{template_root}/adapters/run_qwen3_asr.py' --model '{model_dir}/Qwen--Qwen3-ASR-1.7B' --audio {audio} --language {language} --output-dir '{output_dir}'"
+      timeout_s: 3600
+      smoke_command: "'{env_dir}/bin/python' '{template_root}/adapters/run_qwen3_asr.py' --help"
+      fields:
+        - {name: audio, label: Аудио или видео, type: file}
+        - {name: language, label: Язык (auto для автоопределения), type: text, required: false, default: auto}
 
   - id: lavasr-v2
     name: LavaSR v2
@@ -185,12 +313,36 @@ tools:
     description: Лёгкое speech restoration/super-resolution до 48 kHz, работающее также на CPU.
     source_url: https://github.com/ysharma3501/LavaSR
     repo_url: https://github.com/ysharma3501/LavaSR
+    ref: 33ac040892519c1bb4aed7eb32e79af51cc29e2a
     priority: must
     adapter_status: catalogued
+    verified: installable
+    license_spdx: Apache-2.0
+    license_note: Код Apache-2.0.
+    entrypoint: "pip install git+https://github.com/ysharma3501/LavaSR.git, затем Python API LavaEnhance2(...).enhance() (CLI проект не публикует)"
+    vram_gb: 0.5
+    download_gb: 0.05
     requirements: ["около 500 MB VRAM либо CPU"]
     inputs: [audio]
     outputs: [audio]
-    pipeline: "плохой speech → LavaSR v2 → restored 48 kHz WAV → ASR/A-B QA"
-    install: {mode: git-auto, instructions: "Официальный Python inference ставится отдельно; ComfyUI не обязателен."}
-    models: {mode: manual, instructions: "Скачать LavaSR v2 checkpoint по README."}
+    pipeline: "плохой speech → LavaSR v2 → restored 48 kHz WAV в runs/ → ASR/A-B QA"
+    install:
+      mode: commands
+      python_version: "3.11"
+      commands:
+        - "uv venv '{env_dir}' --python 3.11"
+        - "uv pip install --python '{env_dir}/bin/python' 'git+https://github.com/ysharma3501/LavaSR.git@33ac040892519c1bb4aed7eb32e79af51cc29e2a' soundfile"
+      instructions: "Официальная однострочная установка пакета с закреплённым commit; клонировать репозиторий отдельно не нужно."
+    models:
+      mode: disabled
+      instructions: "Кнопка не нужна: LavaEnhance2 тянет YatharthS/LavaSR (около 50 MB) с Hugging Face при первом запуске."
     launch: {mode: disabled}
+    run:
+      mode: command
+      command: "'{env_dir}/bin/python' '{template_root}/adapters/run_lavasr.py' --audio {audio} --device {device} --denoise {denoise} --output '{output_dir}/lavasr.wav'"
+      timeout_s: 1800
+      smoke_command: "'{env_dir}/bin/python' '{template_root}/adapters/run_lavasr.py' --help"
+      fields:
+        - {name: audio, label: Исходное аудио, type: file}
+        - {name: device, label: Устройство, type: select, choices: [cuda, cpu], default: cuda}
+        - {name: denoise, label: Шумоподавление, type: select, choices: ["false", "true"], default: "false"}

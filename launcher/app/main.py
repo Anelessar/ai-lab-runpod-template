@@ -16,6 +16,7 @@ from .jobs import JobManager
 from .manifest import ManifestRegistry
 from .processes import ProcessManager
 from .projects import ProjectManager
+from .services import ServiceProbe
 from .tools import ToolManager
 
 
@@ -23,10 +24,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or Settings.from_env()
     settings.ensure_runtime()
     registry = ManifestRegistry(settings.manifest_dir).load()
-    jobs = JobManager(settings.logs_dir / "jobs")
-    processes = ProcessManager(settings.logs_dir / "processes")
+    jobs = JobManager(settings.logs_dir / "jobs", settings.state_dir / "jobs")
+    processes = ProcessManager(
+        settings.logs_dir / "processes", settings.state_dir, tool_port=settings.tool_port
+    )
     projects = ProjectManager(settings.projects_dir, settings.bridge_dir, settings.state_dir)
     tools = ToolManager(settings, registry, jobs, processes, projects)
+    probe = ServiceProbe(settings, processes)
 
     app = FastAPI(title="AI Lab Launcher", version="0.1.0")
     template_dir = Path(__file__).resolve().parent / "templates"
@@ -39,6 +43,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.processes = processes
     app.state.projects = projects
     app.state.tools = tools
+    app.state.probe = probe
 
     @app.get("/")
     def dashboard(request: Request, message: str = "", error: str = ""):
@@ -59,8 +64,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "running": processes.current(),
                 "message": message,
                 "error": error,
-                "comfyui_url": settings.public_port_url(8188),
-                "jupyter_url": settings.public_port_url(8888),
+                "comfyui_url": settings.comfyui_url,
+                "jupyter_url": probe.jupyter_url(),
+                "tool_port_url": settings.public_port_url(settings.tool_port),
+                "services": probe.all(),
             },
         )
 
@@ -72,6 +79,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "active_project": projects.active(),
             "running": processes.current(),
         }
+
+    @app.get("/api/services")
+    def api_services():
+        """Truthful state of every port this template declares to RunPod."""
+        return {"services": probe.all(), "ports": {
+            "launcher": settings.launcher_port,
+            "comfyui": settings.comfyui_port,
+            "jupyter": settings.jupyter_port,
+            "tools": settings.tool_port,
+        }}
 
     @app.get("/api/status")
     def api_status():
@@ -176,6 +193,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if action == "stop":
                 tools.stop(tool_id)
                 return go_home(message=f"{tool_id} остановлен")
+            if action == "dismiss":
+                tools.dismiss(tool_id)
+                return go_home(message=f"Статус {tool_id} сброшен")
             if action == "delete-program":
                 tools.delete_program(tool_id)
                 return go_home(message=f"Программа {tool_id} удалена")
@@ -188,17 +208,39 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.get("/tools/{tool_id}/open")
     def open_tool(tool_id: str):
+        """Only ever redirects to a service that just passed its health check."""
         try:
-            tool = registry.get(tool_id)
-            if tool.launch.mode == "comfyui":
-                url = settings.public_port_url(8188)
-            elif tool.launch.mode == "process" and tool.launch.port:
-                url = settings.public_port_url(tool.launch.port) + tool.launch.path
-            else:
-                url = str(tool.source_url)
-            return RedirectResponse(url, status_code=307)
+            return RedirectResponse(tools.open_url(tool_id), status_code=307)
         except Exception as exc:  # noqa: BLE001
             return go_home(error=str(exc))
+
+    @app.get("/tools/{tool_id}/log")
+    def tool_process_log(request: Request, tool_id: str):
+        try:
+            registry.get(tool_id)
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return templates.TemplateResponse(
+            request,
+            "log.html",
+            {"title": f"Лог процесса {tool_id}", "log": tools.process_log(tool_id) or "Лог пуст."},
+        )
+
+    @app.get("/logs/{name}")
+    def service_log(request: Request, name: str):
+        allowed = {"comfyui", "jupyter", "launcher", "tool-port"}
+        if name not in allowed:
+            raise HTTPException(status_code=404, detail="Unknown log")
+        from .services import tail
+
+        return templates.TemplateResponse(
+            request,
+            "log.html",
+            {
+                "title": f"Лог {name}",
+                "log": tail(settings.logs_dir / f"{name}.log", 40000) or "Лог пуст.",
+            },
+        )
 
     @app.get("/api/jobs/{job_id}/log")
     def job_log_api(job_id: str):
