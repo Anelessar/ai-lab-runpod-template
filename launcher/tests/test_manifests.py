@@ -166,3 +166,21 @@ def test_huggingface_downloads_declare_what_must_exist_afterwards() -> None:
             continue
         expected = tool.models.check or [item.path for item in tool.models.files] or tool.models.repo_ids
         assert expected, f"{tool.id} downloads models but never says what should appear"
+
+
+def test_the_committed_status_report_matches_the_manifests() -> None:
+    # The report is the thing a human reads to decide what to try next; it
+    # must not describe a catalogue that no longer exists.
+    import subprocess
+    import sys
+
+    rendered = subprocess.run(
+        [sys.executable, str(ROOT / "scripts" / "report-standalone.py")],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    committed = (ROOT / "docs" / "STANDALONE-STATUS.md").read_text(encoding="utf-8")
+    assert committed == rendered, (
+        "docs/STANDALONE-STATUS.md is stale — run: python3 scripts/report-standalone.py --write"
+    )

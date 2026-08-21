@@ -130,6 +130,8 @@ AI_LAB_RUNPOD_TEMPLATE_ID=YOUR_TEMPLATE_ID \
 
 Каталог хранится в `manifests/*.yaml`; чтобы добавить инструмент, достаточно нового manifest без изменения интерфейса. Тип адаптера выводится из manifest (`http-ui`, `cli-job`, `comfyui`, `web`), в `launcher/app/tools.py` нет ветвлений по конкретному `tool.id`.
 
+Полная таблица по каждому инструменту — что работает, как запустить, что ещё недоступно и почему — лежит в [`docs/STANDALONE-STATUS.md`](docs/STANDALONE-STATUS.md). Она генерируется из manifest командой `python3 scripts/report-standalone.py --write`, и тест не даст ей разойтись с каталогом.
+
 ## Smoke-тест standalone-инструментов
 
 Внутри Pod, без весов и без GPU-прогона:
