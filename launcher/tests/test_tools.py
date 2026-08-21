@@ -205,3 +205,25 @@ def test_dashboard_status_does_not_probe_health_once_per_tool(lab: ToolManager, 
         lab.status(tool)
 
     assert probes["count"] == 1, f"one snapshot expected, made {probes['count']}"
+
+
+def test_a_failed_launch_offers_a_retry_not_a_starting_spinner(lab: ToolManager) -> None:
+    install(lab, "fake-ui")
+    lab.processes.start(
+        "fake-ui",
+        "python3 -c 'import nonexistent_module_for_ai_lab'",
+        name="Fake UI",
+        cwd=lab.paths("fake-ui")["tool"],
+        env={"PATH": "/usr/bin:/bin"},
+        port=lab.processes.allocate_port(),
+        startup_timeout_s=60,
+    )
+    tool = lab.registry.get("fake-ui")
+    assert wait_for(lambda: lab.status(tool)["process_status"] == "failed")
+
+    status = lab.status(tool)
+    # Reporting a dead process as "starting" is the same lie as a RunPod port
+    # stuck on Initializing, just moved inside the UI.
+    assert status["next_action"]["kind"] == "launch"
+    assert status["next_action"]["label"] == "Запустить заново"
+    assert "ModuleNotFoundError" in status["process_error"]

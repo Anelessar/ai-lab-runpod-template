@@ -76,15 +76,26 @@ class ToolPortProxy:
         else:
             await self._http(scope, receive, send)
 
+    def _http_client(self) -> httpx.AsyncClient:
+        """Reuse one client so connections are pooled, not leaked per request.
+
+        Normally the lifespan handler creates it; this also covers callers that
+        drive the app without a lifespan, such as the tests.
+        """
+        if self._client is None:
+            self._client = httpx.AsyncClient(timeout=None, follow_redirects=False)
+        return self._client
+
     async def _lifespan(self, scope, receive, send) -> None:
         while True:
             message = await receive()
             if message["type"] == "lifespan.startup":
-                self._client = httpx.AsyncClient(timeout=None, follow_redirects=False)
+                self._http_client()
                 await send({"type": "lifespan.startup.complete"})
             elif message["type"] == "lifespan.shutdown":
                 if self._client:
                     await self._client.aclose()
+                    self._client = None
                 await send({"type": "lifespan.shutdown.complete"})
                 return
 
@@ -111,7 +122,7 @@ class ToolPortProxy:
             await self._respond(send, 503, [(b"content-type", b"text/html; charset=utf-8")], body)
             return
 
-        client = self._client or httpx.AsyncClient(timeout=None, follow_redirects=False)
+        client = self._http_client()
         target = f"http://127.0.0.1:{route['port']}{scope.get('raw_path', path.encode()).decode()}"
         query = scope.get("query_string", b"").decode()
         if query:

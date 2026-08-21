@@ -20,7 +20,14 @@ from .adapters import (
 from .config import Settings
 from .jobs import Job, JobManager, run_commands
 from .manifest import ManifestRegistry, ToolManifest
-from .processes import STATUS_FAILED, STATUS_READY, STATUS_STOPPED, ProcessManager
+from .processes import (
+    STATUS_DEGRADED,
+    STATUS_FAILED,
+    STATUS_READY,
+    STATUS_STARTING,
+    STATUS_STOPPED,
+    ProcessManager,
+)
 from .projects import ProjectManager, human_size
 from .services import last_error_line, tail
 
@@ -191,10 +198,13 @@ class ToolManager:
             return {"kind": "models", "label": f"Скачать модели{suffix}", "reason": ""}
         if mine and process_status == STATUS_READY:
             return {"kind": "open-ui", "label": "Открыть UI", "reason": ""}
-        if mine and process_status:
+        # A process that already died must never read as "starting" - that is
+        # the same lie as a port stuck on "Initializing", just inside the UI.
+        if mine and process_status in {STATUS_STARTING, STATUS_DEGRADED}:
             return {"kind": "wait", "label": "Запускается…", "reason": ""}
         if tool.has_ui:
-            return {"kind": "launch", "label": "Запустить", "reason": ""}
+            label = "Запустить заново" if process_status == STATUS_FAILED else "Запустить"
+            return {"kind": "launch", "label": label, "reason": ""}
         if tool.has_job:
             return {"kind": "run", "label": "Запустить тест", "reason": ""}
         return {"kind": "none", "label": "", "reason": ""}
