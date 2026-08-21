@@ -11,7 +11,21 @@ permissions:
   packages: write
 
 jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: Install the launcher and its test dependencies
+        run: uv pip install --system -e "./launcher[dev]"
+      - name: Unit and infrastructure tests
+        working-directory: launcher
+        run: python -m pytest -q
+      - name: Shell syntax
+        run: bash -n docker/entrypoint.sh scripts/*.sh
+
   build:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
