@@ -55,7 +55,9 @@ async def test_placeholder_page_instead_of_a_dead_port(tmp_path: Path) -> None:
     route.write_text("{}", encoding="utf-8")
     async with client_for(route) as client:
         response = await client.get("/")
-    assert response.status_code == 503
+    # 200 on purpose: RunPod marks a port Ready only on a 2xx, so a 503 while
+    # idle would put this port back into permanent "Initializing".
+    assert response.status_code == 200
     assert "Launcher" in response.text
 
 
@@ -80,7 +82,7 @@ async def test_unreachable_tool_reports_why_instead_of_hanging(tmp_path: Path) -
     route.write_text('{"tool_id": "demo", "name": "Demo", "port": 1, "status": "starting"}', encoding="utf-8")
     async with client_for(route) as client:
         response = await client.get("/")
-    assert response.status_code == 502
+    assert response.status_code == 200
     assert "Demo" in response.text
 
 

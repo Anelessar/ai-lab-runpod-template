@@ -86,3 +86,16 @@ def test_jupyter_token_is_written_where_the_launcher_can_read_it() -> None:
 def test_stale_tool_route_is_cleared_on_boot() -> None:
     assert "tool-route.json" in ENTRYPOINT
     assert "process.json" in ENTRYPOINT
+
+
+def test_the_idle_tool_port_answers_2xx() -> None:
+    """RunPod labels a port Ready only on a 2xx.
+
+    An idle port that answers 503 is indistinguishable, in the RunPod console,
+    from a port with nothing behind it - which is the bug this port exists to
+    remove. The check lives here, next to the other port invariants, because it
+    is a RunPod contract and not an HTTP detail.
+    """
+    source = (ROOT / "launcher" / "app" / "toolport.py").read_text(encoding="utf-8")
+    assert "await self._respond(send, 503" not in source
+    assert "await self._respond(send, 502" not in source

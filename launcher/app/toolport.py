@@ -119,7 +119,12 @@ class ToolPortProxy:
                 "Запустите его в Launcher — интерфейс появится на этом же адресе.",
                 launcher=self.launcher_url,
             ).encode()
-            await self._respond(send, 503, [(b"content-type", b"text/html; charset=utf-8")], body)
+            # 200, not 503: RunPod's console labels a port "Ready" only on a
+            # 2xx, so answering 503 while idle reproduces the exact permanent
+            # "Initializing" this port exists to eliminate. The page itself
+            # says the port is free, and the Launcher is the source of truth
+            # for whether a tool is running.
+            await self._respond(send, 200, [(b"content-type", b"text/html; charset=utf-8")], body)
             return
 
         client = self._http_client()
@@ -154,10 +159,13 @@ class ToolPortProxy:
             response = await client.send(request, stream=True)
         except httpx.HTTPError as exc:
             body = PLACEHOLDER.format(
-                message=f"{route.get('name', route.get('tool_id'))} ещё не принимает запросы: {exc}",
+                message=f"{route.get('name', route.get('tool_id'))} ещё не принимает запросы: {exc}. "
+                "Обновите страницу через минуту или посмотрите статус и лог в Launcher.",
                 launcher=self.launcher_url,
             ).encode()
-            await self._respond(send, 502, [(b"content-type", b"text/html; charset=utf-8")], body)
+            # Also 200, for the same reason: a tool that is still loading its
+            # weights must not flip the whole port back to "Initializing".
+            await self._respond(send, 200, [(b"content-type", b"text/html; charset=utf-8")], body)
             return
 
         # aiter_raw() forwards the body exactly as received, still compressed,
