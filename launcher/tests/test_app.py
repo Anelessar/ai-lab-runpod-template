@@ -1,7 +1,8 @@
 from pathlib import Path
 
-from app.config import Settings
 from fastapi.testclient import TestClient
+
+from app.config import Settings
 
 ROOT = Path(__file__).resolve().parents[2]
 

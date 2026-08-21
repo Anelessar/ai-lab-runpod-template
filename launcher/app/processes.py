@@ -26,6 +26,8 @@ STATUS_DEGRADED = "degraded"
 STATUS_FAILED = "failed"
 STATUS_STOPPED = "stopped"
 
+CURRENT_TTL = 1.5
+
 
 @dataclass
 class ProcessRecord:
@@ -74,6 +76,10 @@ class ProcessManager:
         self.logs_dir.mkdir(parents=True, exist_ok=True)
         self.state_dir.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
+        # current() is called once per tool while rendering the dashboard, and
+        # each call would otherwise issue its own health probe and rewrite the
+        # state file. One refresh per CURRENT_TTL is plenty for a human.
+        self._cached: tuple[float, dict[str, object] | None] | None = None
         # Children spawned by *this* process have to be reaped here, otherwise
         # they linger as zombies and os.kill(pid, 0) keeps reporting them alive.
         # Processes inherited across a Launcher restart are not in this map and
@@ -104,6 +110,7 @@ class ProcessManager:
         return ProcessRecord(**{key: value for key, value in raw.items() if key in known})
 
     def _write(self, record: ProcessRecord | None) -> None:
+        self._cached = None
         payload = asdict(record) if record else {}
         self._atomic_write(self.state_file, json.dumps(payload, ensure_ascii=False, indent=2))
         route: dict[str, object] = {}
@@ -178,8 +185,17 @@ class ProcessManager:
 
     # ------------------------------------------------------------------- API
 
-    def current(self) -> dict[str, object] | None:
-        """Current tool, or None. Terminal states are reported once then cleared."""
+    def current(self, *, fresh: bool = False) -> dict[str, object] | None:
+        """Current tool, or None, with status recomputed from reality."""
+        with self._lock:
+            cached = self._cached
+            if not fresh and cached and time.time() - cached[0] < CURRENT_TTL:
+                return cached[1]
+            result = self._current_uncached()
+            self._cached = (time.time(), result)
+            return result
+
+    def _current_uncached(self) -> dict[str, object] | None:
         with self._lock:
             record = self._read()
             if not record:
@@ -190,7 +206,7 @@ class ProcessManager:
 
     def occupied_by(self) -> str | None:
         """Tool id that still holds the slot (alive process), else None."""
-        current = self.current()
+        current = self.current(fresh=True)
         if not current:
             return None
         if current["status"] in {STATUS_FAILED, STATUS_STOPPED}:

@@ -21,6 +21,8 @@ jobs:
       - name: Unit and infrastructure tests
         working-directory: launcher
         run: python -m pytest -q
+      - name: Lint
+        run: uvx ruff check launcher adapters
       - name: Shell syntax
         run: bash -n docker/entrypoint.sh scripts/*.sh
 

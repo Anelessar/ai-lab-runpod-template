@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 import yaml
+
 from app.config import Settings
 from app.jobs import COMPLETED, FAILED, JobManager
 from app.manifest import ManifestRegistry
@@ -183,3 +184,24 @@ def test_install_marker_records_the_pinned_ref(lab: ToolManager) -> None:
     marker = lab.paths("fake-cli")["tool"] / INSTALL_MARKER
     assert marker.is_file()
     assert CLI_TOOL["ref"] in marker.read_text(encoding="utf-8")
+
+
+def test_dashboard_status_does_not_probe_health_once_per_tool(lab: ToolManager, monkeypatch) -> None:
+    # The dashboard calls status() for every tool in the catalogue. Without a
+    # shared snapshot that is one health probe and one full model-directory
+    # walk per card, which on a Pod holding tens of GB of weights makes the
+    # page take seconds to render.
+    probes = {"count": 0}
+    original = lab.processes._current_uncached
+
+    def counted():
+        probes["count"] += 1
+        return original()
+
+    monkeypatch.setattr(lab.processes, "_current_uncached", counted)
+    lab.processes._cached = None
+
+    for tool in lab.registry.all():
+        lab.status(tool)
+
+    assert probes["count"] == 1, f"one snapshot expected, made {probes['count']}"

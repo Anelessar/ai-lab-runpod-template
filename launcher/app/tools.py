@@ -5,6 +5,7 @@ import os
 import shlex
 import shutil
 import subprocess
+import time
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
@@ -65,6 +66,9 @@ class ToolManager:
         self.projects = projects
         self.installer = InstallPlanner()
         self.models = ModelFetcher()
+        # Walking a 67 GB checkpoint folder once per tool per page render is
+        # slower than everything else the dashboard does put together.
+        self._disk_cache: dict[Path, tuple[float, str]] = {}
 
     # ---------------------------------------------------------------- context
 
@@ -129,7 +133,9 @@ class ToolManager:
             "process_status": process_status,
             "process_error": str(running["error"]) if mine else "",
             "running_process": running,
-            "slot_taken_by": self.processes.occupied_by(),
+            # Derived from the snapshot above rather than re-probing, so
+            # rendering the whole catalogue costs one health check in total.
+            "slot_taken_by": self._slot_owner(running),
             "active_job": active_job,
             "latest_job": latest,
             "adapter": tool.adapter_type,
@@ -138,10 +144,22 @@ class ToolManager:
             "next_action": self.next_action(tool, installed, models_present, mine, process_status, active_job),
         }
 
-    def _disk(self, path: Path) -> str:
+    @staticmethod
+    def _slot_owner(running: dict[str, object] | None) -> str | None:
+        if not running or running["status"] in {STATUS_FAILED, STATUS_STOPPED}:
+            return None
+        return str(running["tool_id"])
+
+    def _disk(self, path: Path, ttl: float = 30.0) -> str:
         if not path.exists():
             return "0 B"
-        return human_size(sum(item.stat().st_size for item in path.rglob("*") if item.is_file()))
+        cached = self._disk_cache.get(path)
+        now = time.monotonic()
+        if cached and now - cached[0] < ttl:
+            return cached[1]
+        size = human_size(sum(item.stat().st_size for item in path.rglob("*") if item.is_file()))
+        self._disk_cache[path] = (now, size)
+        return size
 
     def next_action(
         self,
