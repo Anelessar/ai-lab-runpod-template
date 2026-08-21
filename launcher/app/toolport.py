@@ -17,6 +17,8 @@ from pathlib import Path
 
 import httpx
 
+BODYLESS_METHODS = {"GET", "HEAD", "OPTIONS", "DELETE", "TRACE"}
+
 HOP_BY_HOP = {
     "connection",
     "keep-alive",
@@ -115,19 +117,27 @@ class ToolPortProxy:
         if query:
             target = f"{target}?{query}"
 
+        method = scope["method"].upper()
+        # A GET forwarded with a streaming body goes out chunked, which some
+        # upstream servers reject outright.
+        body = None if method in BODYLESS_METHODS else self._body_stream(receive)
         headers = [
             (key.decode(), value.decode())
             for key, value in scope.get("headers", [])
             if key.decode().lower() not in HOP_BY_HOP
+            and not (body is None and key.decode().lower() == "content-length")
         ]
         headers.append(("x-forwarded-proto", scope.get("scheme", "http")))
         headers.append(("x-ai-lab-tool", str(route.get("tool_id", ""))))
 
+        # Keeping the client's content-length makes httpx reuse the original
+        # framing instead of re-encoding the body as chunked, which would
+        # otherwise require buffering entire uploads in memory to measure them.
         request = client.build_request(
-            scope["method"],
+            method,
             target,
             headers=headers,
-            content=self._body_stream(receive),
+            content=body,
         )
         try:
             response = await client.send(request, stream=True)
@@ -139,10 +149,12 @@ class ToolPortProxy:
             await self._respond(send, 502, [(b"content-type", b"text/html; charset=utf-8")], body)
             return
 
+        # aiter_raw() forwards the body exactly as received, still compressed,
+        # so content-length and content-encoding both stay accurate.
         out_headers = [
             (key.encode(), value.encode())
             for key, value in response.headers.multi_items()
-            if key.lower() not in HOP_BY_HOP and key.lower() != "content-length"
+            if key.lower() not in HOP_BY_HOP
         ]
         await send({"type": "http.response.start", "status": response.status_code, "headers": out_headers})
         try:

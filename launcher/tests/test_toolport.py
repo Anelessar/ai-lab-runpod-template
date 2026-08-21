@@ -5,7 +5,7 @@ while one is starting, and after one has been stopped.
 """
 
 import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import httpx
@@ -29,7 +29,7 @@ class Upstream(BaseHTTPRequestHandler):
 
 @pytest.fixture
 def upstream():
-    server = HTTPServer(("127.0.0.1", 0), Upstream)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Upstream)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     yield server.server_address[1]
@@ -82,3 +82,56 @@ async def test_unreachable_tool_reports_why_instead_of_hanging(tmp_path: Path) -
         response = await client.get("/")
     assert response.status_code == 502
     assert "Demo" in response.text
+
+
+class Echo(BaseHTTPRequestHandler):
+    def do_POST(self):
+        length = int(self.headers.get("content-length") or 0)
+        payload = self.rfile.read(length)
+        self.send_response(200)
+        self.send_header("content-type", "text/plain; charset=utf-8")
+        self.send_header("content-length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def do_GET(self):
+        framing = self.headers.get("transfer-encoding", "none").encode()
+        self.send_response(200)
+        self.send_header("content-length", str(len(framing)))
+        self.end_headers()
+        self.wfile.write(framing)
+
+    def log_message(self, *args):
+        return
+
+
+@pytest.fixture
+def echo_port():
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Echo)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield server.server_address[1]
+    server.shutdown()
+
+
+def route_to(tmp_path: Path, port: int) -> Path:
+    route = tmp_path / "tool-route.json"
+    route.write_text(
+        f'{{"tool_id": "demo", "name": "Demo", "port": {port}, "status": "ready", "path": "/"}}',
+        encoding="utf-8",
+    )
+    return route
+
+
+@pytest.mark.anyio
+async def test_a_forwarded_get_carries_no_chunked_body(tmp_path: Path, echo_port: int) -> None:
+    async with client_for(route_to(tmp_path, echo_port)) as client:
+        response = await client.get("/")
+    assert response.text == "none"
+
+
+@pytest.mark.anyio
+async def test_post_bodies_reach_the_tool_intact(tmp_path: Path, echo_port: int) -> None:
+    async with client_for(route_to(tmp_path, echo_port)) as client:
+        response = await client.post("/api/predict", content=b'{"data": [1, 2, 3]}')
+    assert response.status_code == 200
+    assert response.text == '{"data": [1, 2, 3]}'

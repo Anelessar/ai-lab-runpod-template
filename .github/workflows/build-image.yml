@@ -16,11 +16,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
-      - name: Install the launcher and its test dependencies
-        run: uv pip install --system -e "./launcher[dev]"
+      - name: Create the test environment
+        run: |
+          uv venv --python 3.12
+          uv pip install -e "./launcher[dev]"
       - name: Unit and infrastructure tests
         working-directory: launcher
-        run: python -m pytest -q
+        run: ../.venv/bin/python -m pytest -q
       - name: Lint
         run: uvx ruff check launcher adapters
       - name: Shell syntax
