@@ -99,3 +99,18 @@ def test_the_idle_tool_port_answers_2xx() -> None:
     source = (ROOT / "launcher" / "app" / "toolport.py").read_text(encoding="utf-8")
     assert "await self._respond(send, 503" not in source
     assert "await self._respond(send, 502" not in source
+
+
+def test_one_dead_service_does_not_take_the_pod_down() -> None:
+    """Killing the Launcher used to stop the whole container.
+
+    The entrypoint ended with `wait "$LAUNCHER_PID"`, so the moment that
+    process died the script returned and the cleanup trap tore everything down
+    - including any project that had not been exported yet.
+    """
+    assert "supervise()" in ENTRYPOINT
+    assert 'wait "$LAUNCHER_PID"' not in ENTRYPOINT
+    assert 'kill -0 "$LAUNCHER_PID"' in ENTRYPOINT
+    assert 'kill -0 "$TOOLPORT_PID"' in ENTRYPOINT
+    for service in ('supervise "Launcher"', 'supervise "Tool port"'):
+        assert service in ENTRYPOINT

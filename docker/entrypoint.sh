@@ -123,10 +123,31 @@ rm -f "$AI_LAB_ROOT/state/process.json" "$AI_LAB_ROOT/state/tool-route.json" \
 # Launcher creates the default project and atomically points these bridge links at it.
 "$LAUNCHER_VENV/bin/python" -c "from app.config import Settings; from app.projects import ProjectManager; s=Settings.from_env(); s.ensure_runtime(); ProjectManager(s.projects_dir,s.bridge_dir,s.state_dir)"
 
+# Both of these are supervised rather than run once. The Pod used to end the
+# moment the Launcher process did - a crash, an OOM, or someone restarting it
+# by hand took the whole container down, and with it every project that had not
+# been exported yet.
+supervise() {
+  local name="$1" logfile="$2"
+  shift 2
+  local attempt=0
+  while true; do
+    "$@" >> "$logfile" 2>&1
+    local code=$?
+    attempt=$((attempt + 1))
+    if (( attempt > 20 )); then
+      log "$name exited $code and has been restarted $attempt times; giving up"
+      return "$code"
+    fi
+    log "$name exited with code $code - restarting (attempt $attempt)"
+    sleep 3
+  done
+}
+
 log "Starting AI Lab Launcher on port $LAUNCHER_PORT"
 cd "$TEMPLATE_ROOT/launcher"
-"$LAUNCHER_VENV/bin/uvicorn" app.main:app --host 0.0.0.0 --port "$LAUNCHER_PORT" \
-  > >(tee -a "$AI_LAB_ROOT/logs/launcher.log") 2>&1 &
+supervise "Launcher" "$AI_LAB_ROOT/logs/launcher.log" \
+  "$LAUNCHER_VENV/bin/uvicorn" app.main:app --host 0.0.0.0 --port "$LAUNCHER_PORT" &
 LAUNCHER_PID=$!
 
 # The tool port is owned by a proxy for the whole life of the Pod, so RunPod
@@ -134,9 +155,9 @@ LAUNCHER_PID=$!
 # running tool's own UI otherwise. Standalone tools bind private loopback ports
 # and are reached through here, which is why no tool needs its own public port.
 log "Starting the standalone tool port on $TOOL_PORT"
-"$LAUNCHER_VENV/bin/uvicorn" app.toolport:app --host 0.0.0.0 --port "$TOOL_PORT" \
-  --ws websockets \
-  > >(tee -a "$AI_LAB_ROOT/logs/tool-port.log") 2>&1 &
+supervise "Tool port" "$AI_LAB_ROOT/logs/tool-port.log" \
+  "$LAUNCHER_VENV/bin/uvicorn" app.toolport:app --host 0.0.0.0 --port "$TOOL_PORT" \
+  --ws websockets &
 TOOLPORT_PID=$!
 
 # Keep the CUDA readiness check inside ComfyUI's background process so Launcher,
@@ -197,5 +218,12 @@ wait_for_service "JupyterLab" "http://127.0.0.1:$JUPYTER_PORT/api" "$JUPYTER_PID
 wait_for_service "ComfyUI" "http://127.0.0.1:$COMFYUI_PORT/" "$COMFY_PID"
 
 log "Open the Launcher for live status of every port: http://127.0.0.1:$LAUNCHER_PORT/"
-log "Startup checks finished; keeping the Pod alive while Launcher is running"
-wait "$LAUNCHER_PID"
+log "Startup checks finished; the Pod stays up while any supervised service is alive"
+
+# Waiting on a single pid meant one dead process ended the Pod. Stay up while
+# anything is still running, so a crashed service can be restarted and a
+# project can still be exported.
+while kill -0 "$LAUNCHER_PID" 2>/dev/null || kill -0 "$TOOLPORT_PID" 2>/dev/null; do
+  sleep 10
+done
+log "All supervised services have stopped; exiting"
