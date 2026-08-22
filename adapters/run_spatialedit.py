@@ -74,7 +74,6 @@ def main() -> None:
     import torch
     from peft import PeftModel
     from PIL import Image
-
     from src.config import load_config_class_from_pyfile
     from src.models import load_dit, load_pipeline
     from src.utils import _dynamic_resize_from_bucket, seed_everything
