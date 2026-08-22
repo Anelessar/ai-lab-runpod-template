@@ -214,19 +214,39 @@ tools:
     kind: standalone
     description: Узкая модель удаления отражений со стекла и окон.
     source_url: https://huggingface.co/huawei-bayerlab/windowseat-reflection-removal-v1-0
+    repo_url: https://github.com/huawei-bayerlab/windowseat-reflection-removal
+    ref: 68948e8269b46c507435213669f63e46f1875493
     priority: must
-    adapter_status: manual
-    verified: catalogued
-    entrypoint: "inference-сниппет из model card"
-    requirements: ["NVIDIA GPU"]
+    adapter_status: catalogued
+    verified: installable
+    license_spdx: Apache-2.0
+    license_note: Код и LoRA Apache-2.0; базовая Qwen-Image-Edit-2509 под собственной лицензией Qwen.
+    entrypoint: "python windowseat_inference.py --input-dir ... --output-dir ..."
+    download_gb: 40
+    requirements: ["NVIDIA GPU", "базовая Qwen-Image-Edit-2509 скачивается автоматически"]
     inputs: [image]
     outputs: [image]
-    pipeline: "photo through glass → WindowSeat → reflection-free PNG → QA"
+    pipeline: "фото через стекло → WindowSeat → PNG без отражений в runs/ (плюс comparison и alternating-видео)"
     install:
-      mode: manual
-      instructions: "Кода в виде репозитория нет — только model card с inference-сниппетом. Закреплять commit нечего, поэтому автоматической установки тоже нет."
-    models: {mode: manual, instructions: "Скачать Huawei BayerLab checkpoint вручную."}
+      mode: git-auto
+      python_version: "3.12"
+      commands:
+        - "uv venv '{env_dir}' --python 3.12"
+        - "uv pip install --python '{env_dir}/bin/python' --torch-backend cu128 -r requirements.max.txt"
+      instructions: "environment.yaml в репозитории — conda, но реальные зависимости в нём это обычный requirements.max.txt, поэтому uv ставит всё сам, без conda."
+    models:
+      mode: disabled
+      instructions: "Отдельная кнопка не нужна: windowseat_inference.py тянет базовую Qwen-Image-Edit-2509 и LoRA huawei-bayerlab/windowseat-reflection-removal-v1-0 через from_pretrained в общий кэш HF_HOME при первом запуске. Скрипт принимает только свой список поддерживаемых базовых моделей, поэтому подменять путь на локальный AI Lab не станет."
     launch: {mode: disabled}
+    run:
+      mode: command
+      # Инструмент батчевый: он читает папку целиком. Кладём выбранное фото в
+      # отдельную input-папку этого запуска, чтобы результат и вход лежали рядом.
+      command: "mkdir -p '{output_dir}/input' && cp {image} '{output_dir}/input/' && '{env_dir}/bin/python' windowseat_inference.py --input-dir '{output_dir}/input' --output-dir '{output_dir}' --device cuda"
+      timeout_s: 3600
+      smoke_command: "'{env_dir}/bin/python' windowseat_inference.py --help"
+      fields:
+        - {name: image, label: Фото через стекло, type: file}
 
   - id: vibe-2b
     name: VIBE 2B
@@ -244,7 +264,7 @@ tools:
     pipeline: "image + инструкция → VIBE → PNG → comparison"
     install:
       mode: manual
-      instructions: "У проекта есть страница и веса, но нет репозитория с installer и зафиксированным commit, поэтому автоматическая установка не заводится."
+      instructions: "У проекта есть страница и веса на Hugging Face, но нет репозитория с inference-кодом, который можно закрепить commit-ом: страница отправляет в Hugging Face Space. Прежде чем делать кнопку, нужно зафиксировать источник кода."
     models: {mode: manual, instructions: "Скачать iitolstykh/VIBE-Image-Edit либо DistilledCFG checkpoint."}
     launch: {mode: disabled}
 

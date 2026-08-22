@@ -11,7 +11,7 @@
 | **SpatialEdit** | installable | one-shot CLI-задача | Launcher → «Установить программу» → «Скачать модели» → «Запустить тест», результат в `runs/spatialedit/` | `8b0b3519e88a` | MIT | ~60 GB |
 | **UniGenDet** | installable | one-shot CLI-задача | Launcher → «Установить программу» → «Скачать модели» → «Запустить тест», результат в `runs/unigenddet/` | `94e039dec7c2` | MIT | ~29 GB |
 | **VIBE 2B** | catalogued | — | только вручную внутри Pod | — | — | — |
-| **WindowSeat v1.0** | catalogued | — | только вручную внутри Pod | — | — | — |
+| **WindowSeat v1.0** | installable | one-shot CLI-задача | Launcher → «Установить программу» → «Запустить тест», результат в `runs/windowseat/` | `68948e8269b4` | Apache-2.0 | ~40 GB |
 | **CoInteract** | installable | one-shot CLI-задача | Launcher → «Установить программу» → «Скачать модели» → «Запустить тест», результат в `runs/cointeract/` | `8858e65e93d6` | Apache-2.0 | ~60 GB |
 | **InteractAvatar** | catalogued | — | только вручную внутри Pod | `5ca013e57189` | Apache-2.0 | — |
 | **SCoPE** | installable | one-shot CLI-задача | Launcher → «Установить программу» → «Скачать модели» → «Запустить тест», результат в `runs/scope/` | `6658d0e28664` | NOASSERTION | ~67 GB |
@@ -22,7 +22,7 @@
 | **IndexTTS-2.5** | launchable | долгоживущий HTTP UI | Launcher → «Установить программу» → «Скачать модели» → «Запустить» → «Открыть UI» (порт 7860) | `4f8792ff120c` | — | ~6 GB |
 | **LongCat-AudioDiT 1B** | installable | one-shot CLI-задача | Launcher → «Установить программу» → «Скачать модели» → «Запустить тест», результат в `runs/longcat-audiodit/` | `12c76b51d2a8` | MIT | ~3 GB |
 | **MiDashengLM-Gen** | installable | one-shot CLI-задача | Launcher → «Установить программу» → «Запустить тест», результат в `runs/midashenglm-gen/` | `fcebd304948d` | Apache-2.0 | качает сам при первом запуске |
-| **MioTTS-2.6B** | catalogued | — | только вручную внутри Pod | — | — | — |
+| **MioTTS-2.6B** | catalogued | — | только вручную внутри Pod | `2763e0910b25` | — | — |
 | **MOSS-TTS v1.5** | installable | долгоживущий HTTP UI | Launcher → «Установить программу» → «Скачать модели» → «Запустить» → «Открыть UI» (порт 7860) | `58b20a0d5fcc` | Apache-2.0 | ~12 GB |
 | **OmniVoice** | installable | долгоживущий HTTP UI | Launcher → «Установить программу» → «Запустить» → «Открыть UI» (порт 7860) | `38e992bc60f8` | Apache-2.0 | качает сам при первом запуске |
 | **TADA 1B / 3B** | unavailable | — | недоступен | — | — | — |
@@ -34,10 +34,9 @@
 
 - **HunyuanImage-3.0-Instruct** (`catalogued`) — Отдельного репозитория с installer нет — только inference-код в model card, рассчитанный на multi-GPU. Одноразовый Pod AI Lab с одной GPU для него не подходит.
 - **ReDesign** (`catalogued`) — Официальная установка — conda environment.yml плюс post_install.sh, который доставляет PyTorch cu128, PaddlePaddle, diffusers из git, sam2 и CUDA-расширение GroundingDINO. Это не воспроизводится в изолированном uv-окружении AI Lab, поэтому кнопки установки нет: ставить вручную в Pod.
-- **VIBE 2B** (`catalogued`) — У проекта есть страница и веса, но нет репозитория с installer и зафиксированным commit, поэтому автоматическая установка не заводится.
-- **WindowSeat v1.0** (`catalogued`) — Кода в виде репозитория нет — только model card с inference-сниппетом. Закреплять commit нечего, поэтому автоматической установки тоже нет.
-- **InteractAvatar** (`catalogued`) — Официальная установка требует conda (librosa и ffmpeg ставятся из conda-forge) и сборки flash_attn 2.7.4.post1 без build isolation. Запуск идёт через шелл-скрипт с путями, зашитыми внутри, а не через CLI с аргументами, поэтому кнопки автозапуска нет.
-- **MioTTS-2.6B** (`catalogued`) — Есть только model card со сниппетом; официального репозитория с installer и закрепляемым commit нет, поэтому автоустановки нет.
+- **VIBE 2B** (`catalogued`) — У проекта есть страница и веса на Hugging Face, но нет репозитория с inference-кодом, который можно закрепить commit-ом: страница отправляет в Hugging Face Space. Прежде чем делать кнопку, нужно зафиксировать источник кода.
+- **InteractAvatar** (`catalogued`) — У скрипта есть полноценный CLI (--task, --ckpt_dir, --transformer_dir, --lora_dir, --save_path и ещё около двадцати флагов), так что автоматизация принципиально возможна. Кнопки пока нет по двум причинам: установка требует сборки flash_attn 2.7.4.post1 без build isolation, и по README не удалось однозначно определить, какими флагами подаются reference-кадр и аудио. Прежде чем делать форму, это нужно проверить на живом Pod, иначе форма будет угадыванием.
+- **MioTTS-2.6B** (`catalogued`) — Официальный репозиторий inference есть и ставится через uv sync, но запуск трёхэтажный: сначала нужно собрать и поднять сервер llama.cpp, затем run_server.py как API на 8001, и только поверх них run_gradio.py. AI Lab ведёт один процесс на инструмент, поэтому кнопки пока нет — нужен отдельный проверенный скрипт, поднимающий все три.
 - **TADA 1B / 3B** (`unavailable`) — Есть только блог-анонс Hume: официальный inference-репозиторий и точные веса для 1B/3B в AI Lab не зафиксированы, поэтому закреплять нечего и обещать запуск нельзя.
 
 ## Настоящие команды запуска
@@ -48,9 +47,9 @@
 - **SpatialEdit**: `python spatialedit_demo.py (демо без аргументов; AI Lab вызывает ту же последовательность через adapters/run_spatialedit.py)`
 - **UniGenDet**: `python demo.py --mode t2i|detection --model_path ./pretrained/bagel_7b_mot --output_dir ...`
 - **VIBE 2B**: `inference-сниппет из model card / Hugging Face Space`
-- **WindowSeat v1.0**: `inference-сниппет из model card`
+- **WindowSeat v1.0**: `python windowseat_inference.py --input-dir ... --output-dir ...`
 - **CoInteract**: `python batch_infer.py --csv_path ... --output_dir ...`
-- **InteractAvatar**: `bash test_inter_tia2mv_GPu_hoi.sh (обёртка над test_wanx_tia2mv_obj_back.py)`
+- **InteractAvatar**: `python test_wanx_tia2mv_obj_back.py --task ... --ckpt_dir ... --save_path ... (шелл-скрипт в репозитории — обёртка над ним)`
 - **SCoPE**: `python inference.py --model_path ... --input_image ... --prompt ... --camera_path ... --output_path ...`
 - **JoyAI-Video-Edit 0811**: `bash deploy/run_server.sh → uvicorn xvideo/serving/serve_joyomni_streaming.py, Web UI на GET /`
 - **MatAnyone2**: `python inference_matanyone2.py -i <video|frames> -m <first-frame mask> -o <output dir>`
@@ -59,7 +58,7 @@
 - **IndexTTS-2.5**: `uv run webui.py --host 0.0.0.0 --port N --model_dir <checkpoints> --version 2.5`
 - **LongCat-AudioDiT 1B**: `python inference.py --text ... --output_audio ... --model_dir ...`
 - **MiDashengLM-Gen**: `uv run python infer.py --text ... --output_dir ...`
-- **MioTTS-2.6B**: `Python/Gradio-сниппет из model card`
+- **MioTTS-2.6B**: `llama.cpp server → python run_server.py --llm-base-url ... → python run_gradio.py`
 - **MOSS-TTS v1.5**: `python clis/moss_tts_local_v1.5_app.py --host 0.0.0.0 --port N --model-dir ... --codec-dir ...`
 - **OmniVoice**: `omnivoice-demo --ip 0.0.0.0 --port N (web UI) либо omnivoice-infer --model k2-fsa/OmniVoice --text ... --output ...`
 - **TADA 1B / 3B**: `не зафиксирован`

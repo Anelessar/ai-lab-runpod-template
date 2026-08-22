@@ -32,14 +32,14 @@ tools:
     verified: catalogued
     license_spdx: Apache-2.0
     license_note: Код Apache-2.0; базовая Wan2.2-TI2V-5B под собственной лицензией Wan.
-    entrypoint: "bash test_inter_tia2mv_GPu_hoi.sh (обёртка над test_wanx_tia2mv_obj_back.py)"
+    entrypoint: "python test_wanx_tia2mv_obj_back.py --task ... --ckpt_dir ... --save_path ... (шелл-скрипт в репозитории — обёртка над ним)"
     requirements: ["Wan2.2-TI2V-5B", "мощная NVIDIA GPU", "flash_attn 2.7.4.post1 из исходников", "librosa и ffmpeg из conda-forge"]
     inputs: [image, audio, text]
     outputs: [video]
     pipeline: "reference frame + action/audio → InteractAvatar → interaction MP4"
     install:
       mode: manual
-      instructions: "Официальная установка требует conda (librosa и ffmpeg ставятся из conda-forge) и сборки flash_attn 2.7.4.post1 без build isolation. Запуск идёт через шелл-скрипт с путями, зашитыми внутри, а не через CLI с аргументами, поэтому кнопки автозапуска нет."
+      instructions: "У скрипта есть полноценный CLI (--task, --ckpt_dir, --transformer_dir, --lora_dir, --save_path и ещё около двадцати флагов), так что автоматизация принципиально возможна. Кнопки пока нет по двум причинам: установка требует сборки flash_attn 2.7.4.post1 без build isolation, и по README не удалось однозначно определить, какими флагами подаются reference-кадр и аудио. Прежде чем делать форму, это нужно проверить на живом Pod, иначе форма будет угадыванием."
     models: {mode: manual, instructions: "Скачать Wan2.2-TI2V-5B base и InteractAvatar checkpoints, затем прописать пути в test_inter_tia2mv_GPu_hoi.sh."}
     launch: {mode: disabled}
 

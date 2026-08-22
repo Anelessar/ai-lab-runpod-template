@@ -199,18 +199,20 @@ tools:
     kind: standalone
     description: Zero-shot voice cloning для English и Japanese.
     source_url: https://huggingface.co/Aratako/MioTTS-2.6B
+    repo_url: https://github.com/Aratako/MioTTS-Inference
+    ref: 2763e0910b251510c6b6a432e5f605d57c5e7ff5
     priority: mid
     adapter_status: manual
     verified: catalogued
-    entrypoint: "Python/Gradio-сниппет из model card"
-    requirements: ["NVIDIA GPU"]
+    entrypoint: "llama.cpp server → python run_server.py --llm-base-url ... → python run_gradio.py"
+    requirements: ["NVIDIA GPU", "собранный llama.cpp", "три одновременных процесса"]
     inputs: [text, audio]
     outputs: [audio]
     pipeline: "text + approved voice reference → MioTTS → WAV → QA"
     install:
       mode: manual
-      instructions: "Есть только model card со сниппетом; официального репозитория с installer и закрепляемым commit нет, поэтому автоустановки нет."
-    models: {mode: manual, instructions: "Скачать Aratako/MioTTS-2.6B вручную."}
+      instructions: "Официальный репозиторий inference есть и ставится через uv sync, но запуск трёхэтажный: сначала нужно собрать и поднять сервер llama.cpp, затем run_server.py как API на 8001, и только поверх них run_gradio.py. AI Lab ведёт один процесс на инструмент, поэтому кнопки пока нет — нужен отдельный проверенный скрипт, поднимающий все три."
+    models: {mode: manual, instructions: "Нужны Aratako/MioTTS-2.6B и кодек Aratako/MioCodec-25Hz-24kHz; для llama.cpp-ветки — GGUF-вариант."}
     launch: {mode: disabled}
 
   - id: tada
