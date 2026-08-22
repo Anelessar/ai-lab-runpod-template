@@ -321,7 +321,7 @@ tools:
       date: "2026-08-21"
       gpu: "NVIDIA RTX 4000 Ada Generation, 20 GB"
       duration_s: 25
-      notes: "Установка закреплённого commit + запуск из Launcher: 3-секундный WAV 16 kHz (96 KB) → runs/lavasr-v2/20260821-223019/lavasr.wav 48 kHz (281 KB), результат виден в галерее проекта. Первый прогон с --device cuda упал на несовпадении torch и драйвера CUDA 12.8; после этого установка пинится к --torch-backend cu128. На CPU работает без оговорок."
+      notes: "Запуск из Launcher на закреплённом commit, 3-секундный WAV 16 kHz (96 KB) → 48 kHz (281 KB), та же длительность 3.00 s, результат в runs/lavasr-v2/<stamp>/lavasr.wav и в галерее проекта. Проверены оба устройства: CPU сразу, GPU — после того как установка стала пиниться к --torch-backend cu128 (без пина torch приходил с несовпадающим CUDA и падал на первом же inference с «The NVIDIA driver on your system is too old»). С пином: torch 2.11.0+cu128, cuda_available True."
     license_spdx: Apache-2.0
     license_note: Код Apache-2.0.
     entrypoint: "pip install git+https://github.com/ysharma3501/LavaSR.git, затем Python API LavaEnhance2(...).enhance() (CLI проект не публикует)"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import shlex
@@ -8,6 +9,7 @@ import subprocess
 import time
 import urllib.request
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 
 from .adapters import (
@@ -32,6 +34,11 @@ from .projects import ProjectManager, human_size
 from .services import last_error_line, tail
 
 INSTALL_MARKER = ".ai-lab-installed.json"
+
+
+@lru_cache(maxsize=1)
+def _hf_transfer_available() -> bool:
+    return importlib.util.find_spec("hf_transfer") is not None
 
 
 def apply_workflow_model_hints(path: Path, workflow) -> None:
@@ -477,7 +484,11 @@ class ToolManager:
                 "AI_LAB_MODEL_DIR": str(context.model_dir),
                 "AI_LAB_PROJECT_DIR": str(context.project_dir),
                 "HF_HOME": str(self.settings.cache_dir / "huggingface"),
-                "HF_HUB_ENABLE_HF_TRANSFER": os.getenv("HF_HUB_ENABLE_HF_TRANSFER", "0"),
+                # The RunPod base image exports HF_HUB_ENABLE_HF_TRANSFER=1
+                # without shipping the package, and huggingface_hub then aborts
+                # every download with a ValueError. Decide it from what is
+                # actually importable rather than inheriting the claim.
+                "HF_HUB_ENABLE_HF_TRANSFER": "1" if _hf_transfer_available() else "0",
                 "MODELSCOPE_CACHE": str(self.settings.cache_dir / "modelscope"),
                 "UV_PROJECT_ENVIRONMENT": str(context.env_dir),
                 "UV_CACHE_DIR": str(self.settings.cache_dir / "uv"),

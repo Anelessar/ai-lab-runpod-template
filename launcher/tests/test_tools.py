@@ -30,7 +30,11 @@ CLI_TOOL = {
     "entrypoint": "python fake.py",
     "pipeline": "in → out",
     "install": {"mode": "commands", "commands": ["true"]},
-    "models": {"mode": "commands", "commands": ["mkdir -p '{model_dir}/weights'"], "check": ["weights"]},
+    "models": {
+        "mode": "commands",
+        "commands": ["mkdir -p '{model_dir}/weights' && echo w > '{model_dir}/weights/model.bin'"],
+        "check": ["weights"],
+    },
     "run": {
         "mode": "command",
         "command": "printf 'result' > '{output_dir}/out.txt'; echo {prompt}",
@@ -118,6 +122,7 @@ def test_models_are_not_reported_present_until_the_expected_files_exist(lab: Too
     assert status["models_missing"] == ["weights"]
 
     (model_dir / "weights").mkdir()
+    (model_dir / "weights" / "model.bin").write_text("w")
     assert lab.status(tool)["models"] is True
 
 
@@ -129,7 +134,9 @@ def test_run_refuses_before_the_weights_are_there(lab: ToolManager) -> None:
 
 def test_run_writes_into_the_active_project_runs_folder(lab: ToolManager) -> None:
     install(lab, "fake-cli")
-    (lab.paths("fake-cli")["model"] / "weights").mkdir(parents=True)
+    weights = lab.paths("fake-cli")["model"] / "weights"
+    weights.mkdir(parents=True)
+    (weights / "model.bin").write_text("w")
 
     job = lab.run("fake-cli", {"prompt": "hello world"})
     assert wait_for(lambda: lab.jobs.latest_for("fake-cli")["status"] in {COMPLETED, FAILED})
@@ -144,7 +151,9 @@ def test_run_writes_into_the_active_project_runs_folder(lab: ToolManager) -> Non
 
 def test_run_field_values_are_quoted_not_interpolated_raw(lab: ToolManager) -> None:
     install(lab, "fake-cli")
-    (lab.paths("fake-cli")["model"] / "weights").mkdir(parents=True)
+    weights = lab.paths("fake-cli")["model"] / "weights"
+    weights.mkdir(parents=True)
+    (weights / "model.bin").write_text("w")
 
     job = lab.run("fake-cli", {"prompt": "hi; touch /tmp/ai-lab-pwned"})
     assert wait_for(lambda: lab.jobs.latest_for("fake-cli")["status"] == COMPLETED)
@@ -154,7 +163,9 @@ def test_run_field_values_are_quoted_not_interpolated_raw(lab: ToolManager) -> N
 
 def test_missing_required_field_is_rejected_with_the_field_label(lab: ToolManager) -> None:
     install(lab, "fake-cli")
-    (lab.paths("fake-cli")["model"] / "weights").mkdir(parents=True)
+    weights = lab.paths("fake-cli")["model"] / "weights"
+    weights.mkdir(parents=True)
+    (weights / "model.bin").write_text("w")
     with pytest.raises(ValueError, match="Prompt"):
         lab.run("fake-cli", {"prompt": "  "})
 
@@ -227,3 +238,45 @@ def test_a_failed_launch_offers_a_retry_not_a_starting_spinner(lab: ToolManager)
     assert status["next_action"]["kind"] == "launch"
     assert status["next_action"]["label"] == "Запустить заново"
     assert "ModuleNotFoundError" in status["process_error"]
+
+
+def test_an_empty_download_directory_is_not_weights(lab: ToolManager) -> None:
+    # `hf download --local-dir X` creates X before it does any work, so a
+    # download that fails still leaves the directory behind. Counting that as
+    # "models present" let a tool offer Launch and then die on a missing
+    # checkpoint - observed on a live Pod.
+    tool = lab.registry.get("fake-cli")
+    model_dir = lab.paths("fake-cli")["model"]
+    (model_dir / "weights").mkdir(parents=True)
+
+    status = lab.status(tool)
+    assert status["models"] is False
+    assert status["models_missing"] == ["weights"]
+
+    (model_dir / "weights" / "model.safetensors").write_bytes(b"weights")
+    assert lab.status(tool)["models"] is True
+
+
+def test_a_zero_byte_download_is_not_weights(lab: ToolManager) -> None:
+    tool = lab.registry.get("fake-cli")
+    model_dir = lab.paths("fake-cli")["model"]
+    model_dir.mkdir(parents=True)
+    (model_dir / "weights").write_bytes(b"")
+
+    assert lab.status(tool)["models"] is False
+
+
+def test_hf_transfer_is_only_claimed_when_it_is_installed(lab: ToolManager, monkeypatch) -> None:
+    # The RunPod base image exports HF_HUB_ENABLE_HF_TRANSFER=1 without
+    # shipping the package; huggingface_hub then refuses every download.
+    monkeypatch.setenv("HF_HUB_ENABLE_HF_TRANSFER", "1")
+    import importlib.util
+
+    from app import tools as tools_module
+
+    tools_module._hf_transfer_available.cache_clear()
+    monkeypatch.setattr(importlib.util, "find_spec", lambda name: None)
+    env = lab.environment(lab.context(lab.registry.get("fake-cli")))
+    tools_module._hf_transfer_available.cache_clear()
+
+    assert env["HF_HUB_ENABLE_HF_TRANSFER"] == "0"

@@ -123,17 +123,32 @@ class ModelFetcher:
             expected = [context.model_dir / item.path for item in tool.models.files]
         return expected
 
+    @staticmethod
+    def _has_content(path: Path) -> bool:
+        """A download counts only once it has actually produced bytes.
+
+        `hf download --local-dir X` creates X before it does any work, so a
+        failed download still leaves the directory behind. Treating that as
+        "weights present" is how a tool ends up offering Launch and then dying
+        on a missing checkpoint.
+        """
+        if path.is_file():
+            return path.stat().st_size > 0
+        if path.is_dir():
+            return any(item.is_file() for item in path.rglob("*"))
+        return False
+
     def present(self, context: ToolContext) -> bool:
         expected = self.expected_paths(context)
         if not expected:
             return False
-        return all(path.exists() for path in expected)
+        return all(self._has_content(path) for path in expected)
 
     def missing(self, context: ToolContext) -> list[str]:
         return [
             path.name
             for path in self.expected_paths(context)
-            if not path.exists()
+            if not self._has_content(path)
         ]
 
 

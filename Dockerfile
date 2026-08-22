@@ -31,7 +31,7 @@ RUN git clone --filter=blob:none https://github.com/Comfy-Org/ComfyUI.git /opt/C
     && uv pip install --system -r /opt/ComfyUI/requirements.txt \
     && uv pip install --system -r /opt/ComfyUI/custom_nodes/ComfyUI_HuggingFace_Downloader/requirements.txt \
     && uv pip install --system -r /opt/ComfyUI/custom_nodes/comfyui-manager/requirements.txt \
-    && uv pip install --system "huggingface_hub[cli]" jupyterlab
+    && uv pip install --system "huggingface_hub[cli]" hf_transfer jupyterlab
 
 WORKDIR /opt/ai-lab-template
 COPY launcher /opt/ai-lab-template/launcher
