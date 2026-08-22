@@ -8,7 +8,7 @@
 | **HiFi-Inpaint** | installable | one-shot CLI-задача | Launcher → «Установить программу» → «Запустить тест», результат в `runs/hifi-inpaint/` | `606a21e7e152` | Apache-2.0 | — |
 | **HunyuanImage-3.0-Instruct** | catalogued | — | только вручную внутри Pod | — | — | — |
 | **ReDesign** | catalogued | — | только вручную внутри Pod | `5023ec3aca2b` | NOASSERTION | — |
-| **SpatialEdit** | catalogued | — | только вручную внутри Pod | `8b0b3519e88a` | MIT | — |
+| **SpatialEdit** | installable | one-shot CLI-задача | Launcher → «Установить программу» → «Скачать модели» → «Запустить тест», результат в `runs/spatialedit/` | `8b0b3519e88a` | MIT | ~60 GB |
 | **UniGenDet** | installable | one-shot CLI-задача | Launcher → «Установить программу» → «Скачать модели» → «Запустить тест», результат в `runs/unigenddet/` | `94e039dec7c2` | MIT | ~29 GB |
 | **VIBE 2B** | catalogued | — | только вручную внутри Pod | — | — | — |
 | **WindowSeat v1.0** | catalogued | — | только вручную внутри Pod | — | — | — |
@@ -34,7 +34,6 @@
 
 - **HunyuanImage-3.0-Instruct** (`catalogued`) — Отдельного репозитория с installer нет — только inference-код в model card, рассчитанный на multi-GPU. Одноразовый Pod AI Lab с одной GPU для него не подходит.
 - **ReDesign** (`catalogued`) — Официальная установка — conda environment.yml плюс post_install.sh, который доставляет PyTorch cu128, PaddlePaddle, diffusers из git, sam2 и CUDA-расширение GroundingDINO. Это не воспроизводится в изолированном uv-окружении AI Lab, поэтому кнопки установки нет: ставить вручную в Pod.
-- **SpatialEdit** (`catalogued`) — pip install -r requirements.txt плюс accelerate/peft/gradio. Автозапуск не заводится по другой причине: spatialedit_demo.py не принимает аргументов — пути к базовой модели и LoRA-чекпоинтам зашиты в самом файле и их нужно править руками перед стартом.
 - **VIBE 2B** (`catalogued`) — У проекта есть страница и веса, но нет репозитория с installer и зафиксированным commit, поэтому автоматическая установка не заводится.
 - **WindowSeat v1.0** (`catalogued`) — Кода в виде репозитория нет — только model card с inference-сниппетом. Закреплять commit нечего, поэтому автоматической установки тоже нет.
 - **InteractAvatar** (`catalogued`) — Официальная установка требует conda (librosa и ffmpeg ставятся из conda-forge) и сборки flash_attn 2.7.4.post1 без build isolation. Запуск идёт через шелл-скрипт с путями, зашитыми внутри, а не через CLI с аргументами, поэтому кнопки автозапуска нет.
@@ -46,7 +45,7 @@
 - **HiFi-Inpaint**: `python inference.py --base_model_path ... --lora_path ... --ref_image ... --mask_image ... --output ...`
 - **HunyuanImage-3.0-Instruct**: `официальный inference-код из model card`
 - **ReDesign**: `conda env create -f environment.yml && bash post_install.sh && python -m ReDesign.run_single_image`
-- **SpatialEdit**: `python spatialedit_demo.py`
+- **SpatialEdit**: `python spatialedit_demo.py (демо без аргументов; AI Lab вызывает ту же последовательность через adapters/run_spatialedit.py)`
 - **UniGenDet**: `python demo.py --mode t2i|detection --model_path ./pretrained/bagel_7b_mot --output_dir ...`
 - **VIBE 2B**: `inference-сниппет из model card / Hugging Face Space`
 - **WindowSeat v1.0**: `inference-сниппет из model card`

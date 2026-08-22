@@ -110,22 +110,47 @@ tools:
     repo_url: https://github.com/EasonXiao-888/SpatialEdit
     ref: 8b0b3519e88a7f91213f8ad4cf079f8f27f1d91d
     priority: must
-    adapter_status: manual
-    verified: catalogued
+    adapter_status: catalogued
+    verified: installable
     license_spdx: MIT
-    license_note: Код MIT; веса SpatialEdit-16B проверить отдельно.
-    entrypoint: "python spatialedit_demo.py"
-    requirements: ["мощная NVIDIA GPU"]
+    license_note: Код MIT; веса SpatialEdit-16B, Qwen3-VL-8B-Instruct и Wan2.1 под собственными лицензиями — проверить каждую отдельно.
+    entrypoint: "python spatialedit_demo.py (демо без аргументов; AI Lab вызывает ту же последовательность через adapters/run_spatialedit.py)"
+    vram_gb: 48
+    download_gb: 60
+    requirements: ["мощная NVIDIA GPU", "сборка flash_attn при установке", "три отдельных набора весов"]
     inputs: [image, text]
     outputs: [image]
-    pipeline: "image + spatial instruction → SpatialEdit → PNG → QA"
+    pipeline: "фото + инструкция про поворот/перемещение объекта → SpatialEdit → PNG в runs/"
     install:
-      mode: manual
-      instructions: "pip install -r requirements.txt плюс accelerate/peft/gradio. Автозапуск не заводится по другой причине: spatialedit_demo.py не принимает аргументов — пути к базовой модели и LoRA-чекпоинтам зашиты в самом файле и их нужно править руками перед стартом."
+      mode: git-auto
+      python_version: "3.10"
+      commands:
+        - "uv venv '{env_dir}' --python 3.10"
+        - "uv pip install --python '{env_dir}/bin/python' --torch-backend cu128 -r requirements.txt"
+        - "uv pip install --python '{env_dir}/bin/python' --torch-backend cu128 accelerate peft pillow"
+      instructions: "requirements.txt тянет flash_attn, который собирается под фактическую GPU — первая установка занимает десятки минут. Честная оговорка: adapters/run_spatialedit.py повторяет ту же последовательность загрузки и inference, что и официальный spatialedit_demo.py, но на GPU он ещё не прогонялся — для этого нужны все 60 GB весов. Поэтому статус installable, а не launchable."
     models:
-      mode: manual
-      instructions: "Скачать SpatialEdit-16B weights и вписать путь в spatialedit_demo.py."
+      mode: huggingface
+      repo_ids:
+        - EasonXiao-888/SpatialEdit-16B
+        - Qwen/Qwen3-VL-8B-Instruct
+        - Wan-AI/Wan2.1-T2V-1.3B
+      size_gb: 60
+      check:
+        - "EasonXiao-888--SpatialEdit-16B"
+        - "Qwen--Qwen3-VL-8B-Instruct"
+        - "Wan-AI--Wan2.1-T2V-1.3B"
+      instructions: "Нужны три набора: сам SpatialEdit-16B (CKPT_PT.pth и CKPT_CT_lora), Qwen3-VL-8B-Instruct как vision-language backbone и Wan2.1_VAE.pth из Wan2.1-T2V-1.3B. Пути к ним AI Lab подставляет в конфиг сам — править your_base_path в файлах репозитория не нужно."
     launch: {mode: disabled}
+    run:
+      mode: command
+      command: "'{env_dir}/bin/python' '{template_root}/adapters/run_spatialedit.py' --image {image} --prompt {prompt} --model-dir '{model_dir}' --device cuda:0 --steps {steps} --output '{output_dir}/spatialedit.png'"
+      timeout_s: 7200
+      smoke_command: "'{env_dir}/bin/python' '{template_root}/adapters/run_spatialedit.py' --help"
+      fields:
+        - {name: image, label: Фото, type: file}
+        - {name: prompt, label: Что сделать с объектом, type: textarea, help: "Например: Rotate the dog to show the front left side view."}
+        - {name: steps, label: Шагов, type: number, required: false, default: "30"}
 
   - id: hifi-inpaint
     name: HiFi-Inpaint
