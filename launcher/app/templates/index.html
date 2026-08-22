@@ -197,7 +197,7 @@
                 </div>
                 {% if tool.run.mode == 'command' and status.installed %}
                   <details class="run-form">
-                    <summary>Запустить тест ({{ tool.adapter }} → runs/{{ tool.id }}/)</summary>
+                    <summary>Запустить тест ({{ status.adapter }} → runs/{{ tool.id }}/)</summary>
                     <form action="/tools/{{ tool.id }}/run" method="post">
                       {% for field in tool.run.fields %}
                         <label>{{ field.label }}

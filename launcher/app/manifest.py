@@ -46,6 +46,11 @@ class CommandAction(BaseModel):
     commands: list[str] = Field(default_factory=list)
     instructions: str = ""
     python_version: str = "3.11"
+    # Plain PyPI serves a torch built for a newer CUDA than the RunPod base
+    # image's driver, which fails only at the first real inference with
+    # "The NVIDIA driver on your system is too old". Pin the wheel index to the
+    # CUDA the image actually ships.
+    torch_backend: str = "cu128"
 
 
 class ModelFile(BaseModel):

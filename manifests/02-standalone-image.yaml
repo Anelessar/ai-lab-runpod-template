@@ -247,7 +247,7 @@ tools:
       python_version: "3.10"
       commands:
         - "uv venv '{env_dir}' --python 3.10"
-        - "uv pip install --python '{env_dir}/bin/python' -r requirements.txt"
+        - "uv pip install --python '{env_dir}/bin/python' --torch-backend cu128 -r requirements.txt"
         - "uv pip install --python '{env_dir}/bin/python' --no-build-isolation flash_attn==2.5.8"
       instructions: "flash_attn собирается из исходников под фактическую GPU — первая установка занимает десятки минут."
     models:

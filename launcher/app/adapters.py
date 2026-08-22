@@ -72,13 +72,19 @@ class InstallPlanner:
 
     def autodetect(self, context: ToolContext) -> list[str]:
         tool_dir = context.tool_dir
-        python = context.tool.install.python_version
+        install = context.tool.install
+        python = install.python_version
+        # A uv project brings its own lock and its own torch index; overriding
+        # it here would defeat the point of installing a pinned commit.
         if (tool_dir / "uv.lock").exists() or (tool_dir / "pyproject.toml").exists():
             return ["uv sync"]
         if (tool_dir / "requirements.txt").exists():
             return [
                 f"uv venv '{{env_dir}}' --python {python}",
-                "uv pip install --python '{env_dir}/bin/python' -r requirements.txt",
+                (
+                    "uv pip install --python '{env_dir}/bin/python' "
+                    f"--torch-backend {install.torch_backend} -r requirements.txt"
+                ),
             ]
         return [f"uv venv '{{env_dir}}' --python {python}"]
 

@@ -27,7 +27,7 @@
 | **OmniVoice** | installable | долгоживущий HTTP UI | Launcher → «Установить программу» → «Запустить» → «Открыть UI» (порт 7860) | `38e992bc60f8` | Apache-2.0 | качает сам при первом запуске |
 | **TADA 1B / 3B** | unavailable | — | недоступен | — | — | — |
 | **VibeVoice-Realtime 0.5B** | installable | долгоживущий HTTP UI | Launcher → «Установить программу» → «Скачать модели» → «Запустить» → «Открыть UI» (порт 7860) | `94da20d98b2f` | MIT | ~2 GB |
-| **LavaSR v2** | installable | one-shot CLI-задача | Launcher → «Установить программу» → «Запустить тест», результат в `runs/lavasr-v2/` | `33ac04089251` | Apache-2.0 | ~50 MB |
+| **LavaSR v2** | smoke-tested | one-shot CLI-задача | Launcher → «Установить программу» → «Запустить тест», результат в `runs/lavasr-v2/` | `33ac04089251` | Apache-2.0 | ~50 MB |
 | **Qwen3-ASR 1.7B / 0.6B** | installable | one-shot CLI-задача | Launcher → «Установить программу» → «Скачать модели» → «Запустить тест», результат в `runs/qwen3-asr/` | `7c6daf77a242` | Apache-2.0 | ~4 GB |
 
 ## Что ещё недоступно и почему

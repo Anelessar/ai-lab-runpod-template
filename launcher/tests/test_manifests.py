@@ -184,3 +184,30 @@ def test_the_committed_status_report_matches_the_manifests() -> None:
     assert committed == rendered, (
         "docs/STANDALONE-STATUS.md is stale — run: python3 scripts/report-standalone.py --write"
     )
+
+
+def test_pypi_installs_pin_the_cuda_the_image_ships() -> None:
+    """A torch from plain PyPI can be built for a newer CUDA than the driver.
+
+    That failure appears only at the first real inference, as "The NVIDIA
+    driver on your system is too old", long after install reported success -
+    which is exactly what happened on the first live run in a Pod.
+    """
+    for tool in REGISTRY.standalone():
+        for command in tool.install.commands:
+            if "uv pip install" not in command:
+                continue
+            # --no-build-isolation compiles an extension against the torch that
+            # is already installed; switching index there would be wrong.
+            if "--no-build-isolation" in command:
+                continue
+            assert "--torch-backend" in command, f"{tool.id}: {command}"
+
+
+def test_smoke_tested_tools_record_where_and_when() -> None:
+    for tool in REGISTRY.all():
+        if tool.verified != "smoke-tested":
+            continue
+        assert tool.smoke is not None
+        assert tool.smoke.gpu.strip(), f"{tool.id}: smoke evidence needs the GPU"
+        assert tool.smoke.date.strip(), f"{tool.id}: smoke evidence needs a date"

@@ -288,7 +288,7 @@ tools:
       python_version: "3.12"
       commands:
         - "uv venv '{env_dir}' --python 3.12"
-        - "uv pip install --python '{env_dir}/bin/python' 'qwen-asr' soundfile"
+        - "uv pip install --python '{env_dir}/bin/python' --torch-backend cu128 'qwen-asr' soundfile"
       instructions: "Клонировать репозиторий не нужно — официальный способ установки это пакет qwen-asr с PyPI."
     models:
       mode: huggingface
@@ -315,8 +315,13 @@ tools:
     repo_url: https://github.com/ysharma3501/LavaSR
     ref: 33ac040892519c1bb4aed7eb32e79af51cc29e2a
     priority: must
-    adapter_status: catalogued
-    verified: installable
+    adapter_status: ready
+    verified: smoke-tested
+    smoke:
+      date: "2026-08-21"
+      gpu: "NVIDIA RTX 4000 Ada Generation, 20 GB"
+      duration_s: 25
+      notes: "Установка закреплённого commit + запуск из Launcher: 3-секундный WAV 16 kHz (96 KB) → runs/lavasr-v2/20260821-223019/lavasr.wav 48 kHz (281 KB), результат виден в галерее проекта. Первый прогон с --device cuda упал на несовпадении torch и драйвера CUDA 12.8; после этого установка пинится к --torch-backend cu128. На CPU работает без оговорок."
     license_spdx: Apache-2.0
     license_note: Код Apache-2.0.
     entrypoint: "pip install git+https://github.com/ysharma3501/LavaSR.git, затем Python API LavaEnhance2(...).enhance() (CLI проект не публикует)"
@@ -331,7 +336,7 @@ tools:
       python_version: "3.11"
       commands:
         - "uv venv '{env_dir}' --python 3.11"
-        - "uv pip install --python '{env_dir}/bin/python' 'git+https://github.com/ysharma3501/LavaSR.git@33ac040892519c1bb4aed7eb32e79af51cc29e2a' soundfile"
+        - "uv pip install --python '{env_dir}/bin/python' --torch-backend cu128 'git+https://github.com/ysharma3501/LavaSR.git@33ac040892519c1bb4aed7eb32e79af51cc29e2a' soundfile"
       instructions: "Официальная однострочная установка пакета с закреплённым commit; клонировать репозиторий отдельно не нужно."
     models:
       mode: disabled
