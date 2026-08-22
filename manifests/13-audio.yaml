@@ -89,10 +89,12 @@ tools:
     repo_url: https://github.com/index-tts/index-tts
     ref: 4f8792ff120cd3ea470dd511e997a17c86cddd10
     priority: must
-    adapter_status: catalogued
-    verified: installable
-    license_spdx: NOASSERTION
-    license_note: Специальная Bilibili Model Use License; перед коммерческой работой проверить условия и при необходимости связаться с командой.
+    adapter_status: ready
+    verified: launchable
+    smoke:
+      date: "2026-08-22"
+      gpu: "NVIDIA RTX 4000 Ada Generation, 20 GB"
+      notes: "Полный цикл из Launcher на RunPod: установка закреплённого commit через uv sync --all-extras, загрузка весов 5.1 GB, запуск. Процесс поднялся на приватном порту 17860 и прошёл health-check; Gradio 5.45.0 «IndexTTS-2.5 Demo» (119 компонентов) открылся в браузере через общий публичный порт 7860 со всеми ассетами. Gradio сам определил свой публичный root по forwarded-заголовкам, root_path настраивать не пришлось. Реальный синтез речи не выполнялся: для него нужен referens-голос, поэтому статус launchable, а не smoke-tested."
     entrypoint: "uv run webui.py --host 0.0.0.0 --port N --model_dir <checkpoints> --version 2.5"
     vram_gb: 6
     download_gb: 6

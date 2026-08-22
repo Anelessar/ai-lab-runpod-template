@@ -19,7 +19,7 @@
 | **MatAnyone2** | installable | one-shot CLI-задача | Launcher → «Установить программу» → «Запустить тест», результат в `runs/matanyone2/` | `0079197acd6d` | NOASSERTION | качает сам при первом запуске |
 | **ReCo / ReCo_Ref** | installable | one-shot CLI-задача | Launcher → «Установить программу» → «Скачать модели» → «Запустить тест», результат в `runs/reco/` | `a5838412dff3` | Apache-2.0 | — |
 | **V-RGBX** | installable | one-shot CLI-задача | Launcher → «Установить программу» → «Скачать модели» → «Запустить тест», результат в `runs/v-rgbx/` | `4de559b89f3e` | Apache-2.0 | — |
-| **IndexTTS-2.5** | installable | долгоживущий HTTP UI | Launcher → «Установить программу» → «Скачать модели» → «Запустить» → «Открыть UI» (порт 7860) | `4f8792ff120c` | NOASSERTION | ~6 GB |
+| **IndexTTS-2.5** | launchable | долгоживущий HTTP UI | Launcher → «Установить программу» → «Скачать модели» → «Запустить» → «Открыть UI» (порт 7860) | `4f8792ff120c` | — | ~6 GB |
 | **LongCat-AudioDiT 1B** | installable | one-shot CLI-задача | Launcher → «Установить программу» → «Скачать модели» → «Запустить тест», результат в `runs/longcat-audiodit/` | `12c76b51d2a8` | MIT | ~3 GB |
 | **MiDashengLM-Gen** | installable | one-shot CLI-задача | Launcher → «Установить программу» → «Запустить тест», результат в `runs/midashenglm-gen/` | `fcebd304948d` | Apache-2.0 | качает сам при первом запуске |
 | **MioTTS-2.6B** | catalogued | — | только вручную внутри Pod | — | — | — |
